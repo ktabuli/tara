@@ -408,3 +408,9 @@ b { font-weight: 800; }
 /* rewards icon tweaks */
 .gem-title .hi { color: var(--teal); vertical-align: -3px; }
 .badge.locked .badge-ico { color: var(--muted); }
+
+/* "recorded" indicator in the glossary */
+.rec-chip { display: inline-flex; align-items: center; gap: 3px; margin-left: 8px;
+  font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .03em;
+  color: var(--teal); background: var(--good-bg); padding: 2px 7px; border-radius: 999px; vertical-align: middle; }
+.rec-chip .hi { color: var(--teal); }

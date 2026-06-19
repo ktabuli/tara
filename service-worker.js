@@ -1,5 +1,5 @@
 /* Service worker — offline cache for Tara! Learn Tagalog (PWA) */
-const CACHE = "tara-tagalog-v13";
+const CACHE = "tara-tagalog-v14";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,7 +10,8 @@ const ASSETS = [
   "./assets/js/store.js",
   "./assets/js/lessons.js",
   "./assets/js/icons.js",
-  "./assets/img/icon.svg"
+  "./assets/img/icon.svg",
+  "./assets/audio/manifest.json"
 ];
 
 self.addEventListener("install", (e) => {

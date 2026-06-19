@@ -9,7 +9,7 @@ import { COURSE, allLessons, unitById } from "./curriculum.js";
 import { store, ACHIEVEMENTS } from "./store.js";
 import {
   allParts, partById, buildSteps, practiceSteps, checkAnswer,
-  speak, listen, canListen, canSpeak, shuffle
+  speak, listen, canListen, canSpeak, shuffle, audioSlug
 } from "./lessons.js";
 import { icon } from "./icons.js";
 
@@ -17,6 +17,15 @@ const app = document.getElementById("app");
 const POOL = allLessons().flatMap((l) => l.vocab);   // distractor pool
 const PARTS = allParts();
 const state = { route: "home" };
+
+/* slugs of words that have a recorded audio file (assets/audio/manifest.json) */
+let RECORDED = new Set();
+function loadRecorded() {
+  fetch("assets/audio/manifest.json")
+    .then((r) => (r.ok ? r.json() : []))
+    .then((list) => { RECORDED = new Set(list); if (state.route === "history") render(); })
+    .catch(() => {});
+}
 
 /* ---------- helpers ---------- */
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
@@ -609,9 +618,10 @@ function renderDashboard() {
  * REVIEW — a hub to review words & mistakes and to practise (no lesson repeats)
  * ===================================================================== */
 function glossRow(w, missed) {
+  const rec = RECORDED.has(audioSlug(w.tl));
   return `<button class="gloss-row" data-say="${esc(w.tl)}" data-search="${esc((w.tl + " " + w.en).toLowerCase())}">
     <div class="gloss-main">
-      <div class="gloss-tl">${w.emoji ? `<span class="gloss-emoji">${w.emoji}</span>` : ""}${esc(w.tl)}</div>
+      <div class="gloss-tl">${w.emoji ? `<span class="gloss-emoji">${w.emoji}</span>` : ""}${esc(w.tl)}${rec ? `<span class="rec-chip" title="Custom audio recorded">${icon("speaking", { size: 12 })} recorded</span>` : ""}</div>
       <div class="gloss-en">${esc(w.en)}${w.say ? ` · <i>${esc(w.say)}</i>` : ""}${missed ? ` · <span class="miss-tag">missed ${w.misses}×</span>` : ""}</div>
     </div>
     <span class="gloss-spk">${icon("audio", { size: 20 })}</span>
@@ -865,6 +875,7 @@ app.addEventListener("click", (e) => {
 });
 
 render();
+loadRecorded();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => navigator.serviceWorker.register("./service-worker.js").catch(() => {}));
