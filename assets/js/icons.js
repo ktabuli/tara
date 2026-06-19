@@ -39,7 +39,7 @@ const PATHS = {
 export function icon(name, { size = 24, cls = '' } = {}) {
   const inner = PATHS[name];
   if (!inner) return '';
-  return `<svg class="hi ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" + 'fill="none" aria-hidden="true" focusable="false">${inner}</svg>`;
+  return `<svg class="hi ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke-width="1.8" aria-hidden="true" focusable="false">${inner}</svg>`;
 }
 
 export function hasIcon(name) { return name in PATHS; }

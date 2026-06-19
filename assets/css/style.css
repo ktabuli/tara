@@ -28,8 +28,9 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-/* ---------- Hugeicons (inline SVG) ---------- */
-.hi { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+/* ---------- Hugeicons (inline SVG, stroke outline only) ---------- */
+.hi { display: inline-block; vertical-align: middle; flex-shrink: 0; fill: none; }
+.hi * { fill: none; stroke-linecap: round; stroke-linejoin: round; }
 .hi.faint { opacity: .35; }
 html, body { margin: 0; padding: 0; }
 body {
