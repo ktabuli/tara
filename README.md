@@ -13,7 +13,7 @@ Built around the project's overview notes:
 | # | Goal | How it's delivered |
 |---|------|--------------------|
 | 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, a learning path with unlockable lessons, stars per lesson, and celebratory finish screens |
-| 2 | **Reading, writing, speech / conversation** | Five exercise types: multiple-choice (reading), type-the-translation (writing), listen-and-choose & speak-aloud (speech via the Web Speech API), and match-the-pairs |
+| 2 | **Reading, writing, speech / conversation** | Interleaved flashcards + games: multiple-choice, type-the-translation, fill-in-the-blank (cloze), tap-to-build a sentence, match-the-pairs, reading-comprehension dialogues, listen-and-choose & speak-aloud (Web Speech API), plus a quiz per lesson. Lessons are split into bite-sized parts that open with a recap |
 | 3 | **Progress tracker / dashboard** | A **Stats** screen with KPIs, a 7-day activity chart, per-unit completion bars, and a skills breakdown |
 | 4 | **Mobile use** | Mobile-first responsive design, installable to the home screen, works offline, big touch targets, bottom tab bar |
 | 5 | **Review history / check off lessons** | A **History** screen listing every lesson with completion check-marks, stars and dates, plus a recent-activity log; replay any lesson anytime |

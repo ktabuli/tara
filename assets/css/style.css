@@ -178,6 +178,37 @@ b { font-weight: 800; }
 /* quiz */
 .quiz-q { align-items: flex-start; }
 .quiz-text { font-size: 1.2rem; font-weight: 800; line-height: 1.4; text-align: left; }
+
+/* recap chip */
+.recap-chip { display: inline-block; background: #eef3f5; color: var(--blue); font-size: .72rem; font-weight: 900;
+  padding: 3px 9px; border-radius: 999px; margin-right: 8px; vertical-align: middle; }
+
+/* fill-in-the-blank (cloze) */
+.cloze-q { gap: 8px; }
+.cloze-sentence { font-size: 1.5rem; font-weight: 900; text-align: center; line-height: 1.4; }
+.cloze-en { color: var(--muted); font-style: italic; font-weight: 700; }
+
+/* build a sentence (tap tiles) */
+.build-en { font-size: 1.15rem; font-weight: 800; text-align: center; margin-bottom: 16px; color: var(--ink); }
+.build-answer { min-height: 56px; border-bottom: 2px dashed var(--line); display: flex; flex-wrap: wrap; gap: 8px;
+  padding: 8px 4px; margin-bottom: 20px; align-content: flex-start; }
+.build-bank { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.tile { padding: 12px 16px; border-radius: 12px; background: var(--card); border: 2px solid var(--line);
+  font-weight: 800; font-size: 1.02rem; box-shadow: 0 3px 0 var(--line); transition: transform .08s; }
+.tile:active { transform: translateY(2px); }
+.tile.used { opacity: .25; pointer-events: none; }
+.tile.placed { background: #eaf0fb; border-color: var(--blue); box-shadow: 0 3px 0 #c9d8f2; }
+.tile.correct { background: var(--good-bg); border-color: var(--good); color: #157f4a; }
+.tile.wrong { background: var(--bad-bg); border-color: var(--bad); color: #b3303f; }
+
+/* reading comprehension */
+.reading-card { background: var(--card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow);
+  margin-bottom: 18px; display: flex; flex-direction: column; gap: 10px; }
+.reading-passage { font-size: 1.12rem; font-weight: 800; line-height: 1.6; }
+.reading-passage div { padding: 2px 0; }
+.reading-en { color: var(--muted); font-style: italic; font-weight: 600; font-size: .9rem; border-top: 1px solid var(--line); padding-top: 10px; }
+.reading-q { font-size: 1.15rem; font-weight: 900; margin-bottom: 14px; }
+.reading-card .speaker-sm { align-self: flex-start; }
 .lesson-body { flex: 1; padding-top: 26px; }
 .lesson-foot { padding-top: 14px; }
 
