@@ -43,6 +43,23 @@ function learnedWords() {
   return [...seen.values()];
 }
 
+/* learned vocab grouped by unit (each word listed under the unit it was first learned) */
+function learnedByUnit() {
+  const seen = new Set();
+  const groups = [];
+  const byId = {};
+  for (const p of PARTS) {
+    if (!store.isCompleted(p.id)) continue;
+    for (const w of p.words) {
+      if (seen.has(w.tl)) continue;
+      seen.add(w.tl);
+      if (!byId[p.unitId]) { byId[p.unitId] = { title: p.unitTitle, words: [] }; groups.push(byId[p.unitId]); }
+      byId[p.unitId].words.push(w);
+    }
+  }
+  return groups;
+}
+
 const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speaking: icon("speaking"), listening: icon("listening") };
 const UNIT_ICON = { u1: "chat", u2: "group", u3: "bus", u4: "dining", u5: "cart", u6: "hearts" };
 
@@ -592,7 +609,7 @@ function renderDashboard() {
  * REVIEW — a hub to review words & mistakes and to practise (no lesson repeats)
  * ===================================================================== */
 function glossRow(w, missed) {
-  return `<button class="gloss-row" data-say="${esc(w.tl)}">
+  return `<button class="gloss-row" data-say="${esc(w.tl)}" data-search="${esc((w.tl + " " + w.en).toLowerCase())}">
     <div class="gloss-main">
       <div class="gloss-tl">${w.emoji ? `<span class="gloss-emoji">${w.emoji}</span>` : ""}${esc(w.tl)}</div>
       <div class="gloss-en">${esc(w.en)}${w.say ? ` · <i>${esc(w.say)}</i>` : ""}${missed ? ` · <span class="miss-tag">missed ${w.misses}×</span>` : ""}</div>
@@ -603,6 +620,7 @@ function glossRow(w, missed) {
 
 function renderHistory() {
   const learned = learnedWords();
+  const groups = learnedByUnit();
   const mistakes = store.mistakeList();
 
   const skill = { reading: 0, writing: 0, speaking: 0, listening: 0 };
@@ -650,14 +668,37 @@ function renderHistory() {
 
       <div class="card">
         <div class="card-title">Words you've learned (${learned.length})</div>
-        ${learned.length
-          ? `<p class="muted small-text">Tap a word to hear it.</p><div class="gloss-list">${learned.map((w) => glossRow(w, false)).join("")}</div>`
-          : `<div class="muted">Finish a lesson to start building your word list.</div>`}
+        ${learned.length ? `
+          ${learned.length > 30 ? `<input class="search-box" id="glossSearch" type="search" placeholder="Search words…" autocomplete="off" />` : `<p class="muted small-text">Tap a word to hear it.</p>`}
+          <div id="learnedList">
+            ${groups.map((g) => `
+              <div class="gloss-group">
+                <div class="gloss-group-title">${esc(g.title)}</div>
+                <div class="gloss-list">${g.words.map((w) => glossRow(w, false)).join("")}</div>
+              </div>`).join("")}
+          </div>
+          <div class="muted small-text gloss-empty hidden" id="glossEmpty">No words match your search.</div>
+        ` : `<div class="muted">Finish a lesson to start building your word list.</div>`}
       </div>
 
       <div class="card"><div class="card-title">Recent activity</div><div class="recent-list">${recent}</div></div>
     </main>
     ${tabBar("history")}`;
+
+  const search = app.querySelector("#glossSearch");
+  if (search) {
+    search.oninput = () => {
+      const q = search.value.trim().toLowerCase();
+      app.querySelectorAll("#learnedList .gloss-row").forEach((r) => r.classList.toggle("hidden", !!q && !r.dataset.search.includes(q)));
+      let anyVisible = false;
+      app.querySelectorAll("#learnedList .gloss-group").forEach((g) => {
+        const visible = [...g.querySelectorAll(".gloss-row")].some((r) => !r.classList.contains("hidden"));
+        g.classList.toggle("hidden", !visible);
+        if (visible) anyVisible = true;
+      });
+      app.querySelector("#glossEmpty").classList.toggle("hidden", anyVisible);
+    };
+  }
 }
 
 /* =====================================================================

@@ -394,3 +394,13 @@ b { font-weight: 800; }
 .gloss-en { color: var(--muted); font-size: .82rem; margin-top: 2px; }
 .gloss-spk { color: var(--teal); display: inline-flex; flex-shrink: 0; }
 .miss-tag { color: var(--red); font-weight: 800; }
+
+/* glossary grouping + search */
+.hidden { display: none !important; }
+.gloss-group-title { font-size: .72rem; font-weight: 900; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--muted); margin: 16px 0 2px; }
+.gloss-group:first-child .gloss-group-title { margin-top: 4px; }
+.search-box { width: 100%; padding: 11px 14px; border-radius: 12px; border: 2px solid var(--line);
+  font-family: inherit; font-size: .95rem; font-weight: 700; background: var(--bg); margin: 4px 0 6px; }
+.search-box:focus { outline: none; border-color: var(--teal); background: var(--card); }
+.gloss-empty { padding: 8px 2px; }
