@@ -65,9 +65,13 @@ python3 -m http.server 8000
 
 ## Curriculum at a glance
 
-1. **Greetings** — hello, goodbye, times of day, polite words
-2. **Getting Acquainted** — introductions, "nice to meet you", first conversation
-3. **Numbers** — 1–10
-4. **Family** — parents, siblings, the whole family
-5. **Food & Drink** — meals, snacks, ordering
-6. **Out & About** — useful questions, getting help, heartfelt phrases
+Based on a 6-unit instructional learning plan. Each lesson teaches its words
+(flashcards first), shows a short **culture/grammar tip**, runs a mix of
+reading/writing/listening/speaking games, and ends with a **quiz question**.
+
+1. **Courtesy & Sentences** — greetings; po/opo respect; V-S-O word order
+2. **Social Interactions** — introductions; the "ba" question particle; pronunciation & stress
+3. **Streets & Transport** — directions (kanan/kaliwa); jeepney phrases (Para po!, Bayad po)
+4. **Dining & Flavors** — hunger/thirst; the "ma-" prefix; the rin/din rule
+5. **Numbers, Time & Shopping** — counting; haggling (tawad); the "alas" time system
+6. **Connection & Tradition** — affection (Mahal kita); Taglish; bayanihan & holidays

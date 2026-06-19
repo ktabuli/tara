@@ -181,10 +181,36 @@ function runIntro(lesson, then) {
         </div>
       </div>`;
     app.querySelector('[data-act="play"]').onclick = () => speak(w.tl);
-    app.querySelector('[data-act="next"]').onclick = () => { i++; i < words.length ? card() : then(); };
+    app.querySelector('[data-act="next"]').onclick = () => { i++; i < words.length ? card() : afterWords(); };
     app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit this lesson?")) go("home"); };
     setTimeout(() => speak(w.tl), 300); // auto-play the word once
   }
+
+  // After the vocabulary, show the culture / grammar tip card, then practice.
+  function afterWords() {
+    if (!lesson.tip) return then();
+    app.innerHTML = `
+      <div class="lesson-shell">
+        <div class="lesson-top">
+          <button class="icon-btn" data-act="quit">✕</button>
+          <div class="bar lesson-bar"><div class="bar-fill" style="width:100%"></div></div>
+          <div class="intro-tag">💡 Culture tip</div>
+        </div>
+        <div class="lesson-body">
+          <div class="tip-card">
+            <div class="tip-emoji">💡</div>
+            <div class="tip-title">${esc(lesson.tip.title)}</div>
+            <div class="tip-body">${esc(lesson.tip.body)}</div>
+          </div>
+        </div>
+        <div class="lesson-foot">
+          <button class="btn btn-primary" data-act="go">Start practice →</button>
+        </div>
+      </div>`;
+    app.querySelector('[data-act="go"]').onclick = () => then();
+    app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit this lesson?")) go("home"); };
+  }
+
   card();
 }
 
@@ -399,6 +425,55 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         selected = null;
       };
     });
+    return;
+  }
+
+  /* ---- QUIZ (lesson's culminating question) ---- */
+  if (ex.type === "quiz") {
+    const q = ex.quiz;
+    if (q.type === "mc") {
+      const opts = shuffle(q.options.slice());
+      body.innerHTML = `
+        <div class="ex-prompt">📝 Quiz</div>
+        <div class="ex-question quiz-q"><div class="quiz-text">${esc(q.q)}</div></div>
+        <div class="options">
+          ${opts.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}
+        </div>`;
+      let answered = false;
+      body.querySelectorAll(".option").forEach((b) => {
+        b.onclick = () => {
+          if (answered) return; answered = true;
+          const ok = checkAnswer({ type: "choose", answer: q.answer }, b.dataset.val);
+          b.classList.add(ok ? "correct" : "wrong");
+          if (!ok) {
+            loseLife();
+            body.querySelectorAll(".option").forEach((x) => { if (checkAnswer({ type: "choose", answer: q.answer }, x.dataset.val)) x.classList.add("correct"); });
+          }
+          body.querySelectorAll(".option").forEach((x) => x.disabled = true);
+          feedbackBar(foot, ok, q.answer, () => done(ok), q.explain);
+        };
+      });
+    } else {
+      // typed answer
+      body.innerHTML = `
+        <div class="ex-prompt">📝 Quiz</div>
+        <div class="ex-question quiz-q"><div class="quiz-text">${esc(q.q)}</div></div>
+        <input class="text-input" id="quizInput" autocomplete="off" autocapitalize="off"
+               spellcheck="false" placeholder="Type your answer…" />
+        <div class="hint">Tip: punctuation and capitals don't matter.</div>`;
+      const input = body.querySelector("#quizInput");
+      setTimeout(() => input.focus(), 50);
+      foot.innerHTML = `<button class="btn btn-primary" data-act="check">Check</button>`;
+      const submit = () => {
+        const ok = checkAnswer({ type: "write", answer: q.answer }, input.value);
+        input.disabled = true;
+        input.classList.add(ok ? "correct" : "wrong");
+        if (!ok) loseLife();
+        feedbackBar(foot, ok, q.answer, () => done(ok), q.explain);
+      };
+      foot.querySelector('[data-act="check"]').onclick = submit;
+      input.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+    }
     return;
   }
 }

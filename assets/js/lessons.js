@@ -55,7 +55,14 @@ export function buildExercises(lesson, coursePool) {
     ex.push({ type: "match", pairs: sample(v, Math.min(4, v.length)) });
   }
 
-  return shuffle(ex);
+  const out = shuffle(ex);
+
+  // The lesson's quiz question always comes last, as a culminating check.
+  if (lesson.quiz) {
+    out.push({ type: "quiz", quiz: lesson.quiz });
+  }
+
+  return out;
 }
 
 function makeExercise(type, word, pool) {

@@ -167,6 +167,17 @@ b { font-weight: 800; }
 .teach-say { color: var(--muted); font-style: italic; font-weight: 700; }
 .teach-arrow { color: var(--muted); font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-top: 6px; }
 .teach-en { font-size: 1.5rem; font-weight: 900; }
+
+/* culture / grammar tip card */
+.tip-card { background: linear-gradient(160deg, #fff8e6, #fff); border: 1px solid var(--gold);
+  border-radius: var(--radius); padding: 26px 22px; box-shadow: var(--shadow-lg); margin-top: 8px; }
+.tip-emoji { font-size: 2.6rem; }
+.tip-title { font-size: 1.25rem; font-weight: 900; margin: 8px 0 10px; }
+.tip-body { font-size: 1.02rem; line-height: 1.5; font-weight: 600; color: #3a4a55; }
+
+/* quiz */
+.quiz-q { align-items: flex-start; }
+.quiz-text { font-size: 1.2rem; font-weight: 800; line-height: 1.4; text-align: left; }
 .lesson-body { flex: 1; padding-top: 26px; }
 .lesson-foot { padding-top: 14px; }
 

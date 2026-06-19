@@ -216,7 +216,7 @@ export const ACHIEVEMENTS = [
   { id: "xp_500", icon: "🌟", title: "High Roller", desc: "Earn 500 XP", test: (s) => s.xp >= 500 },
   { id: "perfect", icon: "💯", title: "Flawless", desc: "Get 3 stars on a lesson", test: (s) => Object.values(s.lessons).some((l) => l.stars === 3) },
   { id: "ten_lessons", icon: "📚", title: "Bookworm", desc: "Complete 10 lessons", test: (s) => Object.keys(s.lessons).length >= 10 },
-  { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => Object.keys(s.lessons).some((id) => id.includes("l3") || id.includes("l4")) },
+  { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => ["u2l2", "u3l2", "u4l2", "u6l1"].some((id) => s.lessons[id]) },
   { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 }
 ];
 
