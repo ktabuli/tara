@@ -21,6 +21,6 @@
     </g>
   </g>
   <!-- speech / chat bubble tail to hint at language learning -->
-  <text x="256" y="400" font-family="Nunito, Arial, sans-serif" font-size="120" font-weight="900"
+  <text x="256" y="400" font-family="Catamaran, Arial, sans-serif" font-size="120" font-weight="900"
         fill="#ffffff" text-anchor="middle">Tara!</text>
 </svg>

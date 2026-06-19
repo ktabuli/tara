@@ -35,7 +35,7 @@
 .hi.faint { opacity: .35; }
 html, body { margin: 0; padding: 0; }
 body {
-  font-family: "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: "Catamaran", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--ink);
   overscroll-behavior-y: none;
