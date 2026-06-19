@@ -31,6 +31,7 @@ function fg(hex) {
 }
 
 const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speaking: icon("speaking"), listening: icon("listening") };
+const UNIT_ICON = { u1: "chat", u2: "group", u3: "bus", u4: "dining", u5: "cart", u6: "hearts" };
 
 /* part index helpers (for unlock + progress) */
 function partIndex(id) { return PARTS.findIndex((p) => p.id === id); }
@@ -82,7 +83,7 @@ function renderHome() {
       <section class="unit">
         <div class="unit-banner" style="background:${unit.color};color:${fg(unit.color)}">
           <div><div class="unit-kicker">UNIT ${ui + 1} · ${esc(unit.subtitle)}</div>
-          <div class="unit-name">${unit.icon} ${esc(unit.title)}</div></div>
+          <div class="unit-name">${icon(UNIT_ICON[unit.id] || "reading", { size: 24 })} ${esc(unit.title)}</div></div>
         </div>
         <div class="path">${nodes}</div>
       </section>`;
@@ -527,7 +528,7 @@ function renderDashboard() {
     const parts = PARTS.filter((p) => p.unitId === u.id);
     const done = parts.filter((p) => store.isCompleted(p.id)).length;
     const pct = Math.round((done / parts.length) * 100);
-    return `<div class="unit-row"><div class="ur-name">${u.icon} ${esc(u.title)}</div>
+    return `<div class="unit-row"><div class="ur-name">${icon(UNIT_ICON[u.id] || "reading", { size: 18 })} ${esc(u.title)}</div>
       <div class="bar small"><div class="bar-fill" style="width:${pct}%;background:${u.color}"></div></div>
       <div class="ur-pct">${done}/${parts.length}</div></div>`;
   }).join("");

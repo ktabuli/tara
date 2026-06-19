@@ -21,7 +21,7 @@ export const COURSE = {
   units: [
     {
       id: "u1", title: "Courtesy & Sentences", subtitle: "Paggalang at Pangungusap",
-      color: "#087E8B", icon: "🙏",
+      color: "#A6D8DD", icon: "🙏",
       lessons: [
         {
           id: "u1l1", title: "Essential Greetings", skill: "reading",
@@ -88,7 +88,7 @@ export const COURSE = {
 
     {
       id: "u2", title: "Social Interactions", subtitle: "Pakikisalamuha",
-      color: "#FF5A5F", icon: "🤝",
+      color: "#FFC2C4", icon: "🤝",
       lessons: [
         {
           id: "u2l1", title: "Getting to Know Others", skill: "reading",
@@ -153,7 +153,7 @@ export const COURSE = {
 
     {
       id: "u3", title: "Streets & Transport", subtitle: "Kalye at Sasakyan",
-      color: "#FFBC42", icon: "🚍",
+      color: "#FFE3AE", icon: "🚍",
       lessons: [
         {
           id: "u3l1", title: "Finding Your Way", skill: "reading",
@@ -218,7 +218,7 @@ export const COURSE = {
 
     {
       id: "u4", title: "Dining & Flavors", subtitle: "Pagkain at Lasa",
-      color: "#0A5F6A", icon: "🍲",
+      color: "#7FC6CE", icon: "🍲",
       lessons: [
         {
           id: "u4l1", title: "Ordering & Preferences", skill: "writing",
@@ -282,7 +282,7 @@ export const COURSE = {
 
     {
       id: "u5", title: "Numbers, Time & Shopping", subtitle: "Bilang, Oras at Palengke",
-      color: "#2A2C24", icon: "🛒",
+      color: "#FFB59E", icon: "🛒",
       lessons: [
         {
           id: "u5l1", title: "Counting & Prices", skill: "reading",
@@ -346,7 +346,7 @@ export const COURSE = {
 
     {
       id: "u6", title: "Connection & Tradition", subtitle: "Ugnayan at Tradisyon",
-      color: "#FF5A5F", icon: "❤️",
+      color: "#FFD480", icon: "❤️",
       lessons: [
         {
           id: "u6l1", title: "Expressions of Care", skill: "speaking",
