@@ -23,6 +23,13 @@ function el(html) { const t = document.createElement("template"); t.innerHTML = 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function go(route) { state.route = route; render(); window.scrollTo({ top: 0 }); }
 
+/* readable foreground (charcoal or white) for a given background colour */
+function fg(hex) {
+  const c = hex.replace("#", "");
+  const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
+  return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#2A2C24" : "#FEFDFF";
+}
+
 const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speaking: icon("speaking"), listening: icon("listening") };
 
 /* part index helpers (for unlock + progress) */
@@ -66,14 +73,14 @@ function renderHome() {
       return `
         <button class="node ${done ? "done" : unlocked ? "ready" : "locked"} pos-${offset}"
                 data-part="${p.id}" ${unlocked ? "" : "disabled"} style="--unit-color:${unit.color}">
-          <span class="node-circle">${done ? icon("check", { size: 34 }) : unlocked ? (SKILL_ICON[p.skill] || icon("reading")) : icon("lock", { size: 28 })}</span>
+          <span class="node-circle" style="${unlocked && !done ? `color:${fg(unit.color)}` : ""}">${done ? icon("check", { size: 34 }) : unlocked ? (SKILL_ICON[p.skill] || icon("reading")) : icon("lock", { size: 28 })}</span>
           <span class="node-stars">${"★".repeat(stars)}${"☆".repeat(done ? 3 - stars : 0)}</span>
           <span class="node-title">${esc(label)}</span>
         </button>`;
     }).join("");
     return `
       <section class="unit">
-        <div class="unit-banner" style="background:${unit.color}">
+        <div class="unit-banner" style="background:${unit.color};color:${fg(unit.color)}">
           <div><div class="unit-kicker">UNIT ${ui + 1} · ${esc(unit.subtitle)}</div>
           <div class="unit-name">${unit.icon} ${esc(unit.title)}</div></div>
         </div>
