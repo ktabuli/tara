@@ -23,6 +23,7 @@ const DEFAULT_STATE = {
   lessons: {},            // { [lessonId]: { stars, attempts, lastScore, completedAt } }
   history: [],            // [{ lessonId, title, score, total, xp, at }]
   achievements: [],       // [achievementId]
+  mistakes: {},           // { [tl]: { tl, en, say, emoji, misses, at } } — words to review
   settings: { sound: true, ttsRate: 0.85 }
 };
 
@@ -171,6 +172,45 @@ class Store {
     const newAchievements = this._checkAchievements();
     this.save();
     return { xpGain, gemGain, stars, newAchievements };
+  }
+
+  /* --- mistakes (words to review) --- */
+  recordMistake(w) {
+    if (!w || !w.tl) return;
+    const m = this.state.mistakes[w.tl] || { tl: w.tl, en: w.en, say: w.say, emoji: w.emoji, misses: 0 };
+    m.misses = (m.misses || 0) + 1;
+    m.at = Date.now();
+    this.state.mistakes[w.tl] = m;
+    this.save();
+  }
+  clearMistake(tl) {
+    if (this.state.mistakes[tl]) { delete this.state.mistakes[tl]; this.save(); }
+  }
+  mistakeList() { return Object.values(this.state.mistakes).sort((a, b) => b.at - a.at); }
+
+  /* --- practice session result (review hub) — does NOT complete a lesson --- */
+  practiceResult({ correct, total, title }) {
+    const score = total > 0 ? correct / total : 0;
+    const xpGain = 5 + Math.round(score * 10);
+    const gemGain = score >= 0.8 ? 2 : 1;
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "practice", title, score: correct, total, xp: xpGain, stars: 0, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { xpGain, gemGain, newAchievements };
   }
 
   /* --- progress helpers --- */

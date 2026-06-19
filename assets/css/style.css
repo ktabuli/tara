@@ -378,3 +378,19 @@ b { font-weight: 800; }
 .speaker-sm .hi { color: var(--teal); }
 .recap-chip .hi { color: var(--teal); }
 .hist-check { color: var(--teal); }
+
+/* ---------- Review hub & glossary ---------- */
+.review-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+.practice-tag { font-weight: 800; font-size: .85rem; color: var(--muted); white-space: nowrap; }
+
+.gloss-list { display: flex; flex-direction: column; }
+.gloss-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  padding: 11px 4px; border-bottom: 1px solid var(--line); }
+.gloss-row:last-child { border-bottom: none; }
+.gloss-row:active { background: var(--bg); }
+.gloss-main { flex: 1; min-width: 0; }
+.gloss-tl { font-weight: 800; font-size: 1rem; display: flex; align-items: center; gap: 7px; }
+.gloss-emoji { font-size: 1.1rem; }
+.gloss-en { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+.gloss-spk { color: var(--teal); display: inline-flex; flex-shrink: 0; }
+.miss-tag { color: var(--red); font-weight: 800; }

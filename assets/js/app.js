@@ -8,7 +8,7 @@
 import { COURSE, allLessons, unitById } from "./curriculum.js";
 import { store, ACHIEVEMENTS } from "./store.js";
 import {
-  allParts, partById, buildSteps, checkAnswer,
+  allParts, partById, buildSteps, practiceSteps, checkAnswer,
   speak, listen, canListen, canSpeak, shuffle
 } from "./lessons.js";
 import { icon } from "./icons.js";
@@ -28,6 +28,19 @@ function fg(hex) {
   const c = hex.replace("#", "");
   const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#2A2C24" : "#FEFDFF";
+}
+
+/* track which vocab words were missed (for the Review hub) */
+function noteWord(ex, ok) {
+  if (!ex || !ex.word) return;
+  if (ok) store.clearMistake(ex.word.tl); else store.recordMistake(ex.word);
+}
+
+/* unique vocab from every completed part */
+function learnedWords() {
+  const seen = new Map();
+  for (const p of PARTS) if (store.isCompleted(p.id)) for (const w of p.words) if (!seen.has(w.tl)) seen.set(w.tl, w);
+  return [...seen.values()];
 }
 
 const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speaking: icon("speaking"), listening: icon("listening") };
@@ -234,6 +247,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       b.onclick = () => {
         if (answered) return; answered = true;
         const ok = checkAnswer(ex, b.dataset.val);
+        noteWord(ex, ok);
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) { loseLife(); body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); }); }
         body.querySelectorAll(".option").forEach((x) => (x.disabled = true));
@@ -257,6 +271,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       b.onclick = () => {
         if (answered) return; answered = true;
         const ok = checkAnswer(ex, b.dataset.val);
+        noteWord(ex, ok);
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) { loseLife(); body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); }); }
         body.querySelectorAll(".option").forEach((x) => (x.disabled = true));
@@ -315,6 +330,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       b.onclick = () => {
         if (answered) return; answered = true;
         const ok = checkAnswer(ex, b.dataset.val);
+        noteWord(ex, ok);
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) { loseLife(); body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); }); }
         body.querySelectorAll(".option").forEach((x) => (x.disabled = true));
@@ -336,6 +352,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
     foot.innerHTML = `<button class="btn btn-primary" data-act="check">Check</button>`;
     const submit = () => {
       const ok = checkAnswer(ex, input.value);
+      noteWord(ex, ok);
       input.disabled = true; input.classList.add(ok ? "correct" : "wrong");
       if (!ok) loseLife();
       feedbackBar(foot, ok, ex.answer, () => done(ok), sayGuide);
@@ -377,6 +394,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         if (!transcript) { status.textContent = "Didn't catch that — try again"; return; }
         heard.innerHTML = `You said: <b>${esc(transcript.split(" | ")[0])}</b>`;
         const ok = checkAnswer(ex, transcript);
+        noteWord(ex, ok);
         status.textContent = ok ? "Great pronunciation!" : "Close — try again or continue";
         feedbackBar(foot, ok, ex.answer, () => done(ok));
       } catch (e) {
@@ -571,37 +589,138 @@ function renderDashboard() {
 }
 
 /* =====================================================================
- * HISTORY
+ * REVIEW — a hub to review words & mistakes and to practise (no lesson repeats)
  * ===================================================================== */
-function renderHistory() {
-  const rows = PARTS.map((p) => {
-    const done = store.isCompleted(p.id), stars = store.lessonStars(p.id);
-    const info = store.state.lessons[p.id];
-    const when = info?.completedAt ? new Date(info.completedAt).toLocaleDateString() : "";
-    const label = p.partCount > 1 ? `${p.title} · ${p.part}` : p.title;
-    return `<div class="hist-row ${done ? "done" : ""}">
-      <div class="hist-check">${done ? icon("check",{size:22}) : icon("lock",{size:18,cls:"faint"})}</div>
-      <div class="hist-main">
-        <div class="hist-title">${SKILL_ICON[p.skill]} ${esc(label)}</div>
-        <div class="hist-sub">${esc(p.unitTitle)} ${done ? `· ${"★".repeat(stars)}${"☆".repeat(3 - stars)} · ${when}` : "· Not started"}</div>
-      </div>
-      <button class="btn-sm" data-replay="${p.id}" ${isUnlocked(p.id) ? "" : "disabled"}>${done ? "Review" : isUnlocked(p.id) ? "Start" : "🔒"}</button>
-    </div>`;
-  }).join("");
+function glossRow(w, missed) {
+  return `<button class="gloss-row" data-say="${esc(w.tl)}">
+    <div class="gloss-main">
+      <div class="gloss-tl">${w.emoji ? `<span class="gloss-emoji">${w.emoji}</span>` : ""}${esc(w.tl)}</div>
+      <div class="gloss-en">${esc(w.en)}${w.say ? ` · <i>${esc(w.say)}</i>` : ""}${missed ? ` · <span class="miss-tag">missed ${w.misses}×</span>` : ""}</div>
+    </div>
+    <span class="gloss-spk">${icon("audio", { size: 20 })}</span>
+  </button>`;
+}
 
-  const recent = store.state.history.slice(0, 12).map((h) => {
+function renderHistory() {
+  const learned = learnedWords();
+  const mistakes = store.mistakeList();
+
+  const skill = { reading: 0, writing: 0, speaking: 0, listening: 0 };
+  PARTS.forEach((p) => { if (store.isCompleted(p.id)) skill[p.skill] = (skill[p.skill] || 0) + 1; });
+
+  const recent = store.state.history.slice(0, 10).map((h) => {
     const dt = new Date(h.at);
-    return `<div class="recent-row"><span>${esc(h.title)}</span><span class="muted">${"★".repeat(h.stars)} · +${h.xp} XP · ${dt.toLocaleDateString()}</span></div>`;
-  }).join("") || `<div class="muted">No activity yet — finish a part to see it here.</div>`;
+    return `<div class="recent-row"><span>${esc(h.title)}</span><span class="muted">+${h.xp} XP · ${dt.toLocaleDateString()}</span></div>`;
+  }).join("") || `<div class="muted">No activity yet.</div>`;
 
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">${icon("history")} Lessons & History</h1>
-      <div class="card"><div class="card-title">All parts</div><div class="hist-list">${rows}</div></div>
+      <h1 class="page-title">${icon("history")} Review</h1>
+
+      <div class="card practice-hub">
+        <div class="card-title">Practice hub</div>
+        <p class="muted small-text">Quick, mixed practice from what you've learned — your lessons stay as they are.</p>
+        <div class="review-actions">
+          <button class="btn btn-primary" data-practice="words" ${learned.length ? "" : "disabled"}>
+            ${icon("build", { size: 20 })} Practice your words${learned.length ? ` (${learned.length})` : ""}
+          </button>
+          <button class="btn ${mistakes.length ? "btn-bad" : "btn-ghost"}" data-practice="mistakes" ${mistakes.length ? "" : "disabled"}>
+            ${icon("reset", { size: 20 })} Review mistakes${mistakes.length ? ` (${mistakes.length})` : ""}
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Skills practised</div>
+        <div class="skill-grid">
+          <div class="skill-cell">${icon("reading", { size: 24 })}<b>${skill.reading}</b><span>Reading</span></div>
+          <div class="skill-cell">${icon("writing", { size: 24 })}<b>${skill.writing}</b><span>Writing</span></div>
+          <div class="skill-cell">${icon("speaking", { size: 24 })}<b>${skill.speaking}</b><span>Speaking</span></div>
+          <div class="skill-cell">${icon("listening", { size: 24 })}<b>${skill.listening}</b><span>Listening</span></div>
+        </div>
+      </div>
+
+      ${mistakes.length ? `
+      <div class="card">
+        <div class="card-title">Words to review (${mistakes.length})</div>
+        <p class="muted small-text">Words you've missed. Tap to hear them, or practise them above.</p>
+        <div class="gloss-list">${mistakes.map((w) => glossRow(w, true)).join("")}</div>
+      </div>` : ""}
+
+      <div class="card">
+        <div class="card-title">Words you've learned (${learned.length})</div>
+        ${learned.length
+          ? `<p class="muted small-text">Tap a word to hear it.</p><div class="gloss-list">${learned.map((w) => glossRow(w, false)).join("")}</div>`
+          : `<div class="muted">Finish a lesson to start building your word list.</div>`}
+      </div>
+
       <div class="card"><div class="card-title">Recent activity</div><div class="recent-list">${recent}</div></div>
     </main>
     ${tabBar("history")}`;
+}
+
+/* =====================================================================
+ * PRACTICE player (Review hub) — fresh drill, no hearts, no lesson completion
+ * ===================================================================== */
+function startPractice(mode) {
+  const words = mode === "mistakes" ? store.mistakeList() : learnedWords();
+  if (!words.length) return;
+  runPractice(mode, shuffle(words).slice(0, 10));
+}
+
+function runPractice(mode, words) {
+  const steps = practiceSteps(words, POOL);
+  const label = mode === "mistakes" ? "Mistake review" : "Word practice";
+  let i = 0, correct = 0;
+  const total = steps.length;
+
+  function paint() {
+    if (i >= total) return finishPractice(mode, label, correct, total);
+    const pct = Math.round((i / total) * 100);
+    app.innerHTML = `
+      <div class="lesson-shell">
+        <div class="lesson-top">
+          <button class="icon-btn" data-act="quit">✕</button>
+          <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="practice-tag">${esc(label)}</div>
+        </div>
+        <div class="lesson-body" id="exbody"></div>
+        <div class="lesson-foot" id="exfoot"></div>
+      </div>`;
+    app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Stop practising?")) go("history"); };
+    renderExercise(steps[i], app.querySelector("#exbody"), app.querySelector("#exfoot"),
+      (ok) => { if (ok) correct++; i++; paint(); }, () => {}); // no hearts in practice
+  }
+  paint();
+}
+
+function finishPractice(mode, label, correct, total) {
+  const r = store.practiceResult({ correct, total, title: label });
+  const pct = total ? Math.round((correct / total) * 100) : 100;
+  const achHtml = r.newAchievements.length
+    ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
+       ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
+  const left = store.mistakeList().length;
+  app.innerHTML = `
+    <div class="center-screen finish">
+      <div class="confetti">🎊</div>
+      <h2>Nice practice!</h2>
+      <div class="result-cards">
+        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
+        <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+      </div>
+      ${mode === "mistakes" ? `<p class="muted">${left ? `${left} word${left > 1 ? "s" : ""} still to review` : "You cleared all your review words! 🎉"}</p>` : ""}
+      ${achHtml}
+      <div class="stack">
+        <button class="btn btn-primary" data-act="back">Back to Review</button>
+        ${(mode === "mistakes" ? left : learnedWords().length) ? `<button class="btn btn-ghost" data-act="again">Practise again</button>` : ""}
+      </div>
+    </div>`;
+  app.querySelector('[data-act="back"]').onclick = () => go("history");
+  const again = app.querySelector('[data-act="again"]');
+  if (again) again.onclick = () => startPractice(mode);
 }
 
 /* =====================================================================
@@ -699,7 +818,8 @@ function render() {
 app.addEventListener("click", (e) => {
   const tab = e.target.closest("[data-route]"); if (tab) return go(tab.dataset.route);
   const part = e.target.closest("[data-part]"); if (part && !part.disabled) return startPart(part.dataset.part);
-  const replay = e.target.closest("[data-replay]"); if (replay && !replay.disabled) return startPart(replay.dataset.replay);
+  const practice = e.target.closest("[data-practice]"); if (practice && !practice.disabled) return startPractice(practice.dataset.practice);
+  const say = e.target.closest("[data-say]"); if (say) return speak(say.dataset.say);
   const hearts = e.target.closest('[data-act="hearts"]'); if (hearts) return go("hearts");
 });
 

@@ -16,7 +16,7 @@ Built around the project's overview notes:
 | 2 | **Reading, writing, speech / conversation** | Interleaved flashcards + games: multiple-choice, type-the-translation, fill-in-the-blank (cloze), tap-to-build a sentence, match-the-pairs, reading-comprehension dialogues, listen-and-choose & speak-aloud (Web Speech API), plus a quiz per lesson. Lessons are split into bite-sized parts that open with a recap |
 | 3 | **Progress tracker / dashboard** | A **Stats** screen with KPIs, a 7-day activity chart, per-unit completion bars, and a skills breakdown |
 | 4 | **Mobile use** | Mobile-first responsive design, installable to the home screen, works offline, big touch targets, bottom tab bar |
-| 5 | **Review history / check off lessons** | A **History** screen listing every lesson with completion check-marks, stars and dates, plus a recent-activity log; replay any lesson anytime |
+| 5 | **Review hub** | A **Review** screen to review words you've learned (tap to hear), revisit past mistakes, see your skills, and run quick mixed **practice** sessions — without repeating completed lessons |
 | 6 | **Daily streak** | Daily XP goal that drives a streak counter (with best-streak tracking and a graceful break if a day is missed) |
 | 7 | **Reward system** | 9 unlockable achievement badges and a gem shop (spend gems to refill hearts) |
 

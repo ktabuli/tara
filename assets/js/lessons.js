@@ -187,6 +187,19 @@ export function buildSteps(part, coursePool) {
 }
 
 /* =====================================================================
+ * Practice session (Review hub) — a fresh mixed drill from a word set.
+ * No teaching steps, no lesson completion; pure review.
+ * ===================================================================== */
+export function practiceSteps(words, coursePool) {
+  const types = ["choose_en", "choose_tl", "listen", "write"];
+  const steps = words.map((w, i) => makeExercise(types[i % types.length], w, coursePool));
+  if (words.length >= 2) {
+    steps.push({ type: "match", pairs: sample(words, Math.min(4, words.length)) });
+  }
+  return shuffle(steps);
+}
+
+/* =====================================================================
  * Answer checking
  * ===================================================================== */
 export function checkAnswer(ex, given) {
