@@ -771,7 +771,7 @@ function renderRewards() {
   const s = store.state;
   const achHtml = ACHIEVEMENTS.map((a) => {
     const got = store.hasAchievement(a.id);
-    return `<div class="badge ${got ? "earned" : "locked"}"><div class="badge-ico">${got ? a.icon : "🔒"}</div>
+    return `<div class="badge ${got ? "earned" : "locked"}"><div class="badge-ico">${got ? a.icon : icon("lock", { size: 30 })}</div>
       <div class="badge-title">${esc(a.title)}</div><div class="badge-desc">${esc(a.desc)}</div></div>`;
   }).join("");
   app.innerHTML = `
@@ -779,9 +779,9 @@ function renderRewards() {
     <main class="screen">
       <h1 class="page-title">${icon("rewards")} Rewards</h1>
       <div class="card shop-card">
-        <div class="card-title">💎 ${s.gems} gems</div>
+        <div class="card-title gem-title">${icon("gems", { size: 20 })} ${s.gems} gems</div>
         <p class="muted small-text">Earn gems by finishing parts. Better scores earn more.</p>
-        <button class="btn btn-primary" data-act="buyhearts">Refill hearts — 50 💎</button>
+        <button class="btn btn-primary" data-act="buyhearts">${icon("hearts", { size: 20 })} Refill hearts — 50 ${icon("gems", { size: 18 })}</button>
       </div>
       <div class="card"><div class="card-title">Achievements — ${s.achievements.length}/${ACHIEVEMENTS.length}</div>
         <div class="badges-grid">${achHtml}</div></div>

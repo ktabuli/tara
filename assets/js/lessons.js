@@ -231,7 +231,9 @@ function pickVoice() {
   );
 }
 export function canSpeak() { return typeof window !== "undefined" && "speechSynthesis" in window; }
-export function speak(text) {
+
+/* Speak with the browser's text-to-speech voice. */
+function ttsSpeak(text) {
   if (!canSpeak() || !text) return;
   try {
     window.speechSynthesis.cancel();
@@ -242,6 +244,35 @@ export function speak(text) {
     u.rate = store.state.settings.ttsRate || 0.85;
     window.speechSynthesis.speak(u);
   } catch (e) { /* ignore */ }
+}
+
+/* Turn a Tagalog phrase into an audio filename slug, e.g.
+ * "Magandang umaga" -> "magandang-umaga", "Saan ang banyo?" -> "saan-ang-banyo" */
+export function audioSlug(text) {
+  return String(text).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+}
+
+const _audioMissing = new Set(); // slugs with no recorded file (don't retry)
+
+/* Play recorded human audio if available (assets/audio/<slug>.mp3),
+ * otherwise fall back to the browser's text-to-speech. */
+export function speak(text) {
+  if (!text) return;
+  const slug = audioSlug(text);
+  if (slug && typeof Audio !== "undefined" && !_audioMissing.has(slug)) {
+    let fellBack = false;
+    const fallback = () => { if (fellBack) return; fellBack = true; _audioMissing.add(slug); ttsSpeak(text); };
+    try {
+      if (canSpeak()) window.speechSynthesis.cancel();
+      const a = new Audio(`assets/audio/${slug}.mp3`);
+      a.addEventListener("error", fallback, { once: true });
+      const p = a.play();
+      if (p && p.catch) p.catch(fallback);
+      return;
+    } catch (e) { ttsSpeak(text); return; }
+  }
+  ttsSpeak(text);
 }
 
 /* =====================================================================
