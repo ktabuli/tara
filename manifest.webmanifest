@@ -1,0 +1,21 @@
+{
+  "name": "Tara! — Learn Tagalog",
+  "short_name": "Tara!",
+  "description": "Learn Tagalog / Filipino the fun way — gamified reading, writing, listening and speaking for English speakers.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3f6f8",
+  "theme_color": "#1f9d8f",
+  "categories": ["education", "lifestyle"],
+  "lang": "en-CA",
+  "icons": [
+    {
+      "src": "./assets/img/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
