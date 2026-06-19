@@ -156,7 +156,9 @@ class Store {
     if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
     this.state.todayXp += xpGain;
 
-    if (this.state.todayXp >= DAILY_GOAL_XP && this.state.lastActiveDate !== t) {
+    // Streak: finishing ANY lesson counts the day toward your streak.
+    // (The daily XP goal is a separate motivator shown on the home screen.)
+    if (this.state.lastActiveDate !== t) {
       const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
       this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
       this.state.lastActiveDate = t;

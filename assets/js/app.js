@@ -145,7 +145,47 @@ function startLesson(lessonId) {
   const lesson = lessonById(lessonId);
   if (!lesson) { go("home"); return; }
   const exercises = buildExercises(lesson, COURSE_POOL);
-  runLesson(lesson, exercises);
+  // Teach the words first (flashcards), THEN quiz — so beginners always have
+  // a reference for what each word means before being tested on it.
+  runIntro(lesson, () => runLesson(lesson, exercises));
+}
+
+/* Vocabulary preview — step through each new word before the exercises. */
+function runIntro(lesson, then) {
+  const words = lesson.vocab;
+  let i = 0;
+
+  function card() {
+    const w = words[i];
+    const pct = Math.round((i / words.length) * 100);
+    app.innerHTML = `
+      <div class="lesson-shell">
+        <div class="lesson-top">
+          <button class="icon-btn" data-act="quit">✕</button>
+          <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="intro-tag">New word ${i + 1}/${words.length}</div>
+        </div>
+        <div class="lesson-body">
+          <div class="ex-prompt">Learn this word</div>
+          <div class="teach-card">
+            ${w.emoji ? `<div class="teach-emoji">${w.emoji}</div>` : ""}
+            <div class="teach-tl">${esc(w.tl)}</div>
+            <button class="speaker-sm" data-act="play">🔊 Hear it</button>
+            ${w.say ? `<div class="teach-say">${esc(w.say)}</div>` : ""}
+            <div class="teach-arrow">means</div>
+            <div class="teach-en">${esc(w.en)}</div>
+          </div>
+        </div>
+        <div class="lesson-foot">
+          <button class="btn btn-primary" data-act="next">${i === words.length - 1 ? "Start practice →" : "Next"}</button>
+        </div>
+      </div>`;
+    app.querySelector('[data-act="play"]').onclick = () => speak(w.tl);
+    app.querySelector('[data-act="next"]').onclick = () => { i++; i < words.length ? card() : then(); };
+    app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit this lesson?")) go("home"); };
+    setTimeout(() => speak(w.tl), 300); // auto-play the word once
+  }
+  card();
 }
 
 function runLesson(lesson, exercises) {
@@ -170,25 +210,35 @@ function runLesson(lesson, exercises) {
 
     const body = app.querySelector("#exbody");
     const foot = app.querySelector("#exfoot");
+
+    // Decrement a heart immediately and visibly the moment an answer is wrong.
+    const loseLife = () => {
+      store.loseHeart();
+      const hm = app.querySelector(".hearts-mini");
+      if (hm) {
+        hm.textContent = `❤️ ${store.hearts}`;
+        hm.classList.remove("lost"); void hm.offsetWidth; hm.classList.add("lost");
+      }
+    };
+
     renderExercise(ex, body, foot, (wasCorrect) => {
       if (wasCorrect) correct++;
-      else store.loseHeart();
-      if (store.hearts <= 0 && !wasCorrect) { return outOfHearts(lesson); }
+      if (store.hearts <= 0) { return outOfHearts(lesson); }
       i++;
       paint();
-    });
+    }, loseLife);
   }
   paint();
 }
 
-function feedbackBar(foot, correctness, answerText, onNext) {
+function feedbackBar(foot, correctness, answerText, onNext, sayGuide) {
   const fb = el(`
     <div class="feedback ${correctness ? "good" : "bad"}">
       <div class="fb-head">
         <span class="fb-ico">${correctness ? "✅" : "❌"}</span>
         <div>
           <div class="fb-title">${correctness ? "Tama! (Correct)" : "Almost!"}</div>
-          ${correctness ? "" : `<div class="fb-sub">Answer: <b>${esc(answerText)}</b></div>`}
+          ${correctness ? "" : `<div class="fb-sub">Answer: <b>${esc(answerText)}</b>${sayGuide ? ` · <i>${esc(sayGuide)}</i>` : ""}</div>`}
         </div>
       </div>
       <button class="btn ${correctness ? "btn-good" : "btn-bad"}" data-act="next">Continue</button>
@@ -198,8 +248,9 @@ function feedbackBar(foot, correctness, answerText, onNext) {
   fb.querySelector('[data-act="next"]').onclick = onNext;
 }
 
-function renderExercise(ex, body, foot, done) {
+function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   const word = ex.word;
+  const sayGuide = word?.say;
 
   /* ---- MULTIPLE CHOICE / LISTEN ---- */
   if (ex.type === "choose" || ex.type === "listen") {
@@ -228,10 +279,11 @@ function renderExercise(ex, body, foot, done) {
         const ok = checkAnswer(ex, b.dataset.val);
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) {
+          loseLife();
           body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); });
         }
         body.querySelectorAll(".option").forEach((x) => x.disabled = true);
-        feedbackBar(foot, ok, ex.answer, () => done(ok));
+        feedbackBar(foot, ok, ex.answer, () => done(ok), sayGuide);
       };
     });
     return;
@@ -255,7 +307,8 @@ function renderExercise(ex, body, foot, done) {
       const ok = checkAnswer(ex, input.value);
       input.disabled = true;
       input.classList.add(ok ? "correct" : "wrong");
-      feedbackBar(foot, ok, ex.answer, () => done(ok));
+      if (!ok) loseLife();
+      feedbackBar(foot, ok, ex.answer, () => done(ok), sayGuide);
     };
     foot.querySelector('[data-act="check"]').onclick = submit;
     input.onkeydown = (e) => { if (e.key === "Enter") submit(); };

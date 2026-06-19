@@ -151,6 +151,22 @@ b { font-weight: 800; }
 .lesson-top { display: flex; align-items: center; gap: 12px; }
 .lesson-bar { flex: 1; }
 .hearts-mini { font-weight: 900; color: var(--red); font-size: .95rem; }
+.hearts-mini.lost { animation: heartlost .5s; }
+@keyframes heartlost {
+  0% { transform: scale(1.5); color: #ff1f3d; }
+  40% { transform: scale(.8); }
+  100% { transform: scale(1); }
+}
+.intro-tag { font-weight: 900; color: var(--blue); font-size: .8rem; white-space: nowrap; }
+
+/* teaching / flashcard */
+.teach-card { background: var(--card); border-radius: var(--radius); padding: 30px 24px; box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; margin-top: 8px; }
+.teach-emoji { font-size: 3.6rem; }
+.teach-tl { font-size: 2.1rem; font-weight: 900; color: var(--teal); }
+.teach-say { color: var(--muted); font-style: italic; font-weight: 700; }
+.teach-arrow { color: var(--muted); font-size: .8rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; margin-top: 6px; }
+.teach-en { font-size: 1.5rem; font-weight: 900; }
 .lesson-body { flex: 1; padding-top: 26px; }
 .lesson-foot { padding-top: 14px; }
 
