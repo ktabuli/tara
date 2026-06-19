@@ -11,6 +11,7 @@ import {
   allParts, partById, buildSteps, checkAnswer,
   speak, listen, canListen, canSpeak, shuffle
 } from "./lessons.js";
+import { icon } from "./icons.js";
 
 const app = document.getElementById("app");
 const POOL = allLessons().flatMap((l) => l.vocab);   // distractor pool
@@ -22,7 +23,7 @@ function el(html) { const t = document.createElement("template"); t.innerHTML = 
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function go(route) { state.route = route; render(); window.scrollTo({ top: 0 }); }
 
-const SKILL_ICON = { reading: "📖", writing: "✏️", speaking: "🎤", listening: "🎧" };
+const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speaking: icon("speaking"), listening: icon("listening") };
 
 /* part index helpers (for unlock + progress) */
 function partIndex(id) { return PARTS.findIndex((p) => p.id === id); }
@@ -35,16 +36,16 @@ function statsBar() {
   const s = store.state;
   return `
     <header class="topbar">
-      <div class="stat" title="Day streak"><span class="stat-ico">🔥</span><span class="stat-val">${s.streak}</span></div>
-      <div class="stat" title="Gems"><span class="stat-ico">💎</span><span class="stat-val">${s.gems}</span></div>
-      <div class="stat hearts" data-act="hearts" title="Hearts"><span class="stat-ico">❤️</span><span class="stat-val">${store.hearts}</span></div>
-      <div class="stat level-pill" title="Level ${store.level()}"><span class="stat-ico">⭐</span><span class="stat-val">Lv ${store.level()}</span></div>
+      <div class="stat s-streak" title="Day streak"><span class="stat-ico">${icon("streak", { size: 20 })}</span><span class="stat-val">${s.streak}</span></div>
+      <div class="stat s-gems" title="Gems"><span class="stat-ico">${icon("gems", { size: 20 })}</span><span class="stat-val">${s.gems}</span></div>
+      <div class="stat hearts" data-act="hearts" title="Hearts"><span class="stat-ico">${icon("hearts", { size: 20 })}</span><span class="stat-val">${store.hearts}</span></div>
+      <div class="stat level-pill" title="Level ${store.level()}"><span class="stat-ico">${icon("level", { size: 20 })}</span><span class="stat-val">Lv ${store.level()}</span></div>
     </header>`;
 }
 function tabBar(active) {
-  const tabs = [["home", "🏠", "Learn"], ["dashboard", "📊", "Stats"], ["history", "🕘", "History"], ["rewards", "🏆", "Rewards"], ["profile", "👤", "Profile"]];
-  return `<nav class="tabbar">${tabs.map(([r, i, l]) =>
-    `<button class="tab ${active === r ? "active" : ""}" data-route="${r}"><span class="tab-ico">${i}</span><span class="tab-label">${l}</span></button>`).join("")}</nav>`;
+  const tabs = [["home", "home", "Learn"], ["dashboard", "stats", "Stats"], ["history", "history", "History"], ["rewards", "rewards", "Rewards"], ["profile", "profile", "Profile"]];
+  return `<nav class="tabbar">${tabs.map(([r, ic, l]) =>
+    `<button class="tab ${active === r ? "active" : ""}" data-route="${r}"><span class="tab-ico">${icon(ic, { size: 26 })}</span><span class="tab-label">${l}</span></button>`).join("")}</nav>`;
 }
 
 /* =====================================================================
@@ -65,7 +66,7 @@ function renderHome() {
       return `
         <button class="node ${done ? "done" : unlocked ? "ready" : "locked"} pos-${offset}"
                 data-part="${p.id}" ${unlocked ? "" : "disabled"} style="--unit-color:${unit.color}">
-          <span class="node-circle">${done ? "✓" : unlocked ? SKILL_ICON[p.skill] || "📘" : "🔒"}</span>
+          <span class="node-circle">${done ? icon("check", { size: 34 }) : unlocked ? (SKILL_ICON[p.skill] || icon("reading")) : icon("lock", { size: 28 })}</span>
           <span class="node-stars">${"★".repeat(stars)}${"☆".repeat(done ? 3 - stars : 0)}</span>
           <span class="node-title">${esc(label)}</span>
         </button>`;
@@ -121,7 +122,7 @@ function runPart(part, steps) {
         <div class="lesson-top">
           <button class="icon-btn" data-act="quit">✕</button>
           <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-          <div class="hearts-mini">❤️ ${store.hearts}</div>
+          <div class="hearts-mini">${icon("hearts", { size: 20 })} ${store.hearts}</div>
         </div>
         <div class="lesson-body" id="exbody"></div>
         <div class="lesson-foot" id="exfoot"></div>
@@ -133,7 +134,7 @@ function runPart(part, steps) {
   function loseLife() {
     store.loseHeart();
     const hm = app.querySelector(".hearts-mini");
-    if (hm) { hm.textContent = `❤️ ${store.hearts}`; hm.classList.remove("lost"); void hm.offsetWidth; hm.classList.add("lost"); }
+    if (hm) { hm.innerHTML = `${icon("hearts", { size: 20 })} ${store.hearts}`; hm.classList.remove("lost"); void hm.offsetWidth; hm.classList.add("lost"); }
   }
 
   function next(wasCorrect) {
@@ -156,9 +157,9 @@ function runPart(part, steps) {
 /* ---------- non-scored teaching steps ---------- */
 function renderTip(tip, body, foot, onNext) {
   body.innerHTML = `
-    <div class="ex-prompt">💡 Culture tip</div>
+    <div class="ex-prompt">${icon("tip")} Culture tip</div>
     <div class="tip-card">
-      <div class="tip-emoji">💡</div>
+      <div class="tip-emoji">${icon("tip", { size: 44 })}</div>
       <div class="tip-title">${esc(tip.title)}</div>
       <div class="tip-body">${esc(tip.body)}</div>
     </div>`;
@@ -172,7 +173,7 @@ function renderTeach(w, body, foot, onNext) {
     <div class="teach-card">
       ${w.emoji ? `<div class="teach-emoji">${w.emoji}</div>` : ""}
       <div class="teach-tl">${esc(w.tl)}</div>
-      <button class="speaker-sm" data-act="play">🔊 Hear it</button>
+      <button class="speaker-sm" data-act="play">${icon("audio",{size:18})} Hear it</button>
       ${w.say ? `<div class="teach-say">${esc(w.say)}</div>` : ""}
       <div class="teach-arrow">means</div>
       <div class="teach-en">${esc(w.en)}</div>
@@ -188,7 +189,7 @@ function feedbackBar(foot, ok, answerText, onNext, extra) {
   const fb = el(`
     <div class="feedback ${ok ? "good" : "bad"}">
       <div class="fb-head">
-        <span class="fb-ico">${ok ? "✅" : "❌"}</span>
+        <span class="fb-ico">${ok ? icon("check",{size:26}) : icon("cancel",{size:26})}</span>
         <div>
           <div class="fb-title">${ok ? "Tama! (Correct)" : "Almost!"}</div>
           ${ok ? (extra ? `<div class="fb-sub">${esc(extra)}</div>` : "") : `<div class="fb-sub">Answer: <b>${esc(answerText)}</b>${extra ? ` · ${esc(extra)}` : ""}</div>`}
@@ -204,7 +205,7 @@ function feedbackBar(foot, ok, answerText, onNext, extra) {
 function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   const word = ex.word;
   const sayGuide = word?.say;
-  const recapTag = ex.isRecap ? `<span class="recap-chip">🔁 Recap</span>` : "";
+  const recapTag = ex.isRecap ? `<span class="recap-chip">${icon("reset",{size:14})} Recap</span>` : "";
 
   /* MULTIPLE CHOICE / LISTEN */
   if (ex.type === "choose" || ex.type === "listen") {
@@ -212,10 +213,10 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
     body.innerHTML = `
       <div class="ex-prompt">${recapTag}${esc(ex.prompt)}</div>
       ${isListen
-        ? `<button class="speaker-big" data-act="play">🔊<span>Tap to listen</span></button>`
+        ? `<button class="speaker-big" data-act="play">${icon("audio",{size:34})}<span>Tap to listen</span></button>`
         : `<div class="ex-question">${word?.emoji ? `<div class="ex-emoji">${word.emoji}</div>` : ""}
              <div class="ex-word">${esc(ex.question)}</div>
-             ${ex.speakable ? `<button class="speaker-sm" data-act="play">🔊</button>` : ""}</div>`}
+             ${ex.speakable ? `<button class="speaker-sm" data-act="play">${icon("audio",{size:18})}</button>` : ""}</div>`}
       <div class="options">${ex.options.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
     const p = body.querySelector('[data-act="play"]');
     if (p) p.onclick = () => speak(ex.speakable);
@@ -237,7 +238,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   /* FILL IN THE BLANK (cloze) */
   if (ex.type === "cloze") {
     body.innerHTML = `
-      <div class="ex-prompt">✍️ Fill in the blank</div>
+      <div class="ex-prompt">${icon("blank")} Fill in the blank</div>
       <div class="ex-question cloze-q">
         <div class="cloze-sentence">${esc(ex.display)}</div>
         <div class="cloze-en">${esc(ex.en)}</div>
@@ -262,7 +263,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   if (ex.type === "build") {
     const chosen = [];
     body.innerHTML = `
-      <div class="ex-prompt">🧩 Tap the words in order</div>
+      <div class="ex-prompt">${icon("build")} Tap the words in order</div>
       <div class="build-en">${esc(ex.en)}</div>
       <div class="build-answer" id="buildAns"></div>
       <div class="build-bank" id="buildBank">
@@ -292,10 +293,10 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   /* READING COMPREHENSION */
   if (ex.type === "reading") {
     body.innerHTML = `
-      <div class="ex-prompt">📖 Read & answer</div>
+      <div class="ex-prompt">${icon("reading")} Read & answer</div>
       <div class="reading-card">
         <div class="reading-passage">${ex.passage.split("\n").map((l) => `<div>${esc(l)}</div>`).join("")}</div>
-        <button class="speaker-sm" data-act="play">🔊 Listen</button>
+        <button class="speaker-sm" data-act="play">${icon("audio",{size:18})} Listen</button>
         <div class="reading-en">${esc(ex.en)}</div>
       </div>
       <div class="reading-q">${esc(ex.q)}</div>
@@ -344,10 +345,10 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       <div class="ex-question speak-q">
         <div class="ex-word big">${esc(ex.question)}</div>
         ${ex.hint ? `<div class="say-guide">${esc(ex.hint)}</div>` : ""}
-        <button class="speaker-sm" data-act="play">🔊 Hear it</button>
+        <button class="speaker-sm" data-act="play">${icon("audio",{size:18})} Hear it</button>
       </div>
       <div class="mic-wrap">
-        <button class="mic-btn" data-act="mic" ${supported ? "" : "disabled"}>🎤</button>
+        <button class="mic-btn" data-act="mic" ${supported ? "" : "disabled"}>${icon("speaking",{size:40})}</button>
         <div class="mic-status" id="micStatus">${supported ? "Tap the mic and say it" : "Speech input isn't supported on this browser"}</div>
         <div class="heard" id="heard"></div>
       </div>`;
@@ -385,7 +386,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
     const left = shuffle(pairs.map((p) => ({ k: p.tl, match: p.en })));
     const right = shuffle(pairs.map((p) => ({ k: p.en, match: p.tl })));
     body.innerHTML = `
-      <div class="ex-prompt">🔗 Tap the matching pairs</div>
+      <div class="ex-prompt">${icon("match")} Tap the matching pairs</div>
       <div class="match-grid">
         <div class="match-col">${left.map((x) => `<button class="match-item" data-side="L" data-key="${esc(x.k)}" data-match="${esc(x.match)}">${esc(x.k)}</button>`).join("")}</div>
         <div class="match-col">${right.map((x) => `<button class="match-item" data-side="R" data-key="${esc(x.k)}" data-match="${esc(x.match)}">${esc(x.k)}</button>`).join("")}</div>
@@ -417,7 +418,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
     if (q.type === "mc") {
       const opts = shuffle(q.options.slice());
       body.innerHTML = `
-        <div class="ex-prompt">📝 Quiz</div>
+        <div class="ex-prompt">${icon("quiz")} Quiz</div>
         <div class="ex-question quiz-q"><div class="quiz-text">${esc(q.q)}</div></div>
         <div class="options">${opts.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
       let answered = false;
@@ -433,7 +434,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       });
     } else {
       body.innerHTML = `
-        <div class="ex-prompt">📝 Quiz</div>
+        <div class="ex-prompt">${icon("quiz")} Quiz</div>
         <div class="ex-question quiz-q"><div class="quiz-text">${esc(q.q)}</div></div>
         <input class="text-input" id="quizInput" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type your answer…" />
         <div class="hint">Tip: punctuation and capitals don't matter.</div>`;
@@ -481,9 +482,9 @@ function finishPart(part, correct, total) {
       <div class="stars-row">${[1, 2, 3].map((n) => `<span class="fstar ${n <= r.stars ? "on" : ""}">★</span>`).join("")}</div>
       <h2>Part complete!</h2>
       <div class="result-cards">
-        <div class="rc"><div class="rc-ico">🎯</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
-        <div class="rc"><div class="rc-ico">⭐</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">💎</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
+        <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
       ${achHtml}
       <div class="stack">
@@ -527,12 +528,12 @@ function renderDashboard() {
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">📊 Your Progress</h1>
+      <h1 class="page-title">${icon("stats")} Your Progress</h1>
       <div class="kpi-grid">
-        <div class="kpi"><div class="kpi-ico">⭐</div><div class="kpi-val">${s.xp}</div><div class="kpi-lab">Total XP</div></div>
-        <div class="kpi"><div class="kpi-ico">🔥</div><div class="kpi-val">${s.streak}</div><div class="kpi-lab">Day streak</div></div>
-        <div class="kpi"><div class="kpi-ico">📈</div><div class="kpi-val">Lv ${store.level()}</div><div class="kpi-lab">Level</div></div>
-        <div class="kpi"><div class="kpi-ico">✅</div><div class="kpi-val">${completed}</div><div class="kpi-lab">Parts done</div></div>
+        <div class="kpi"><div class="kpi-ico s-level">${icon("level")}</div><div class="kpi-val">${s.xp}</div><div class="kpi-lab">Total XP</div></div>
+        <div class="kpi"><div class="kpi-ico s-streak">${icon("streak")}</div><div class="kpi-val">${s.streak}</div><div class="kpi-lab">Day streak</div></div>
+        <div class="kpi"><div class="kpi-ico">${icon("stats")}</div><div class="kpi-val">Lv ${store.level()}</div><div class="kpi-lab">Level</div></div>
+        <div class="kpi"><div class="kpi-ico">${icon("check")}</div><div class="kpi-val">${completed}</div><div class="kpi-lab">Parts done</div></div>
       </div>
       <div class="card">
         <div class="card-title">Level ${store.level()} progress</div>
@@ -551,10 +552,10 @@ function renderDashboard() {
       <div class="card">
         <div class="card-title">Skills practiced</div>
         <div class="skill-grid">
-          <div class="skill-cell">📖<b>${skill.reading}</b><span>Reading</span></div>
-          <div class="skill-cell">✏️<b>${skill.writing}</b><span>Writing</span></div>
-          <div class="skill-cell">🎤<b>${skill.speaking}</b><span>Speaking</span></div>
-          <div class="skill-cell">🎧<b>${skill.listening}</b><span>Listening</span></div>
+          <div class="skill-cell">${icon("reading", { size: 26 })}<b>${skill.reading}</b><span>Reading</span></div>
+          <div class="skill-cell">${icon("writing", { size: 26 })}<b>${skill.writing}</b><span>Writing</span></div>
+          <div class="skill-cell">${icon("speaking", { size: 26 })}<b>${skill.speaking}</b><span>Speaking</span></div>
+          <div class="skill-cell">${icon("listening", { size: 26 })}<b>${skill.listening}</b><span>Listening</span></div>
         </div>
       </div>
     </main>
@@ -571,7 +572,7 @@ function renderHistory() {
     const when = info?.completedAt ? new Date(info.completedAt).toLocaleDateString() : "";
     const label = p.partCount > 1 ? `${p.title} · ${p.part}` : p.title;
     return `<div class="hist-row ${done ? "done" : ""}">
-      <div class="hist-check">${done ? "✅" : "⬜"}</div>
+      <div class="hist-check">${done ? icon("check",{size:22}) : icon("lock",{size:18,cls:"faint"})}</div>
       <div class="hist-main">
         <div class="hist-title">${SKILL_ICON[p.skill]} ${esc(label)}</div>
         <div class="hist-sub">${esc(p.unitTitle)} ${done ? `· ${"★".repeat(stars)}${"☆".repeat(3 - stars)} · ${when}` : "· Not started"}</div>
@@ -588,7 +589,7 @@ function renderHistory() {
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">🕘 Lessons & History</h1>
+      <h1 class="page-title">${icon("history")} Lessons & History</h1>
       <div class="card"><div class="card-title">All parts</div><div class="hist-list">${rows}</div></div>
       <div class="card"><div class="card-title">Recent activity</div><div class="recent-list">${recent}</div></div>
     </main>
@@ -608,7 +609,7 @@ function renderRewards() {
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">🏆 Rewards</h1>
+      <h1 class="page-title">${icon("rewards")} Rewards</h1>
       <div class="card shop-card">
         <div class="card-title">💎 ${s.gems} gems</div>
         <p class="muted small-text">Earn gems by finishing parts. Better scores earn more.</p>
@@ -633,7 +634,7 @@ function renderProfile() {
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">👤 Profile</h1>
+      <h1 class="page-title">${icon("profile")} Profile</h1>
       <div class="card profile-head"><div class="avatar">🐃</div>
         <div><div class="profile-name">Tagalog Learner</div><div class="muted small-text">Learning Tagalog · Joined ${joined}</div></div></div>
       <div class="card"><div class="card-title">Summary</div>
@@ -643,7 +644,7 @@ function renderProfile() {
           <div><b>${s.achievements.length}</b><span>Badges</span></div><div><b>${s.gems}</b><span>Gems</span></div>
         </div></div>
       <div class="card"><div class="card-title">Settings</div>
-        <label class="setting-row"><span>🔊 Speech speed</span><input type="range" min="0.5" max="1.2" step="0.05" value="${s.settings.ttsRate}" id="rate"></label>
+        <label class="setting-row"><span>${icon("audio",{size:18})} Speech speed</span><input type="range" min="0.5" max="1.2" step="0.05" value="${s.settings.ttsRate}" id="rate"></label>
         <button class="btn btn-ghost" data-act="testvoice">Test voice 🔉</button>
         <div class="muted small-text">${canSpeak() ? "Speech playback available" : "⚠️ No speech voices in this browser"} · ${canListen() ? "Microphone input available" : "⚠️ No speech recognition in this browser"}</div></div>
       <div class="card danger"><div class="card-title">Reset</div>
@@ -666,9 +667,9 @@ function renderHearts() {
   app.innerHTML = `
     ${statsBar()}
     <main class="screen">
-      <h1 class="page-title">❤️ Hearts</h1>
+      <h1 class="page-title">${icon("hearts")} Hearts</h1>
       <div class="card center-card">
-        <div class="big-emoji">${"❤️".repeat(store.hearts)}${"🤍".repeat(5 - store.hearts)}</div>
+        <div class="big-hearts">${`<span class="hfull">${icon("hearts", { size: 40 })}</span>`.repeat(store.hearts)}${`<span class="hempty">${icon("hearts", { size: 40 })}</span>`.repeat(5 - store.hearts)}</div>
         <p>You have <b>${store.hearts}</b> of 5 hearts.</p>
         <p class="muted small-text">${store.hearts >= 5 ? "Hearts are full!" : `Next heart in about ${mins} min. Hearts also refill as you take lessons.`}</p>
         <button class="btn btn-primary" data-act="buy">Refill now — 50 💎</button>
