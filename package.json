@@ -1,0 +1,10 @@
+{
+  "name": "tara-tagalog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tara! — a gamified Tagalog/Filipino learning PWA",
+  "scripts": {
+    "test": "node --test"
+  }
+}

@@ -63,6 +63,18 @@ python3 -m http.server 8000
 
 > 💡 Speech recognition (the microphone exercises) works best in Chrome/Edge and requires a secure context (`https://` or `localhost`).
 
+## Tests
+
+Unit tests cover the pure logic (curriculum integrity, the lesson/part &
+exercise engine, and the progress store). They use Node's built-in test
+runner — **no dependencies, no build**:
+
+```bash
+node --test        # or: npm test
+```
+
+They also run automatically in CI on every push (`.github/workflows/test.yml`).
+
 ## Curriculum at a glance
 
 Based on a 6-unit instructional learning plan. Each lesson teaches its words
