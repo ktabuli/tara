@@ -25,6 +25,7 @@ const DEFAULT_STATE = {
   achievements: [],       // [achievementId]
   mistakes: {},           // { [tl]: { tl, en, say, emoji, misses, at } } — words to review
   unitTests: {},          // { [unitId]: { bestPct, passed, attempts, at } }
+  checkpoints: {},        // { [cpId]: { bestPct, attempts, done, at } } — cumulative reviews
   settings: { sound: true, ttsRate: 0.85 }
 };
 
@@ -252,6 +253,39 @@ class Store {
   unitTestPassed(unitId) { return !!(this.state.unitTests[unitId] && this.state.unitTests[unitId].passed); }
   unitTestBest(unitId) { return this.state.unitTests[unitId]?.bestPct || 0; }
 
+  /* --- checkpoint (cumulative mixed review every few lessons) --- */
+  checkpointResult({ id, title, correct, total }) {
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const xpGain = 25 + Math.round((pct / 100) * 35);
+    const gemGain = 5 + (pct >= 80 ? 5 : 0);
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const prev = this.state.checkpoints[id];
+    this.state.checkpoints[id] = {
+      bestPct: Math.max(pct, prev?.bestPct || 0),
+      attempts: (prev?.attempts || 0) + 1, done: true, at: Date.now()
+    };
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "checkpoint:" + id, title, score: correct, total, xp: xpGain, stars: 0, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { pct, xpGain, gemGain, newAchievements };
+  }
+  checkpointDone(id) { return !!(this.state.checkpoints[id] && this.state.checkpoints[id].done); }
+  checkpointBest(id) { return this.state.checkpoints[id]?.bestPct || 0; }
+
   /* --- progress helpers --- */
   isCompleted(lessonId) { return !!this.state.lessons[lessonId]; }
   lessonStars(lessonId) { return this.state.lessons[lessonId]?.stars || 0; }
@@ -298,7 +332,8 @@ export const ACHIEVEMENTS = [
   { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => ["u2l2", "u3l2", "u4l2", "u6l1"].some((id) => Object.keys(s.lessons).some((k) => k.startsWith(id))) },
   { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 },
   { id: "unit_master", icon: "🎓", title: "Unit Master", desc: "Pass your first unit test", test: (s) => Object.values(s.unitTests || {}).some((u) => u.passed) },
-  { id: "graduate", icon: "🏅", title: "Graduate", desc: "Pass all 6 unit tests", test: (s) => Object.values(s.unitTests || {}).filter((u) => u.passed).length >= 6 }
+  { id: "graduate", icon: "🏅", title: "Graduate", desc: "Pass all 6 unit tests", test: (s) => Object.values(s.unitTests || {}).filter((u) => u.passed).length >= 6 },
+  { id: "reviewer", icon: "🧠", title: "Memory Master", desc: "Finish a checkpoint review", test: (s) => Object.keys(s.checkpoints || {}).length >= 1 }
 ];
 
 export const store = new Store();

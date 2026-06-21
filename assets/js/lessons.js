@@ -265,6 +265,33 @@ export function unitTestSteps(unit, coursePool) {
 }
 
 /* =====================================================================
+ * Checkpoint — a heavier, cumulative mixed review drawn from everything
+ * the learner has seen so far. Lots of "mix & match" plus vocab, fill-
+ * blank and build. `known` = all vocab learned up to this point.
+ * ===================================================================== */
+export function checkpointSteps(known, sentences = []) {
+  const pool = known;
+  const steps = [];
+  const types = ["choose_en", "choose_tl", "listen", "write"];
+
+  // vocab questions over a wide sample of learned words
+  shuffle(known).slice(0, 14).forEach((w) => steps.push(makeExercise(sample(types, 1)[0], w, pool)));
+
+  // a fill-in-the-blank and a build from learned-word sentences
+  for (const s of shuffle(sentences)) { const cz = makeCloze(s, pool); if (cz) { steps.push(cz); break; } }
+  const buildable = sentences.filter((s) => { const n = s.tl.split(" ").length; return n >= 3 && n <= 6; });
+  if (buildable.length) steps.push(makeBuild(sample(buildable, 1)[0]));
+
+  // several "mix & match" rounds across different words
+  const mw = shuffle(known);
+  for (let i = 0; i + 1 < mw.length && steps.filter((s) => s.type === "match").length < 3; i += 4) {
+    const group = mw.slice(i, i + 4);
+    if (group.length >= 2) steps.push({ type: "match", pairs: group });
+  }
+  return shuffle(steps);
+}
+
+/* =====================================================================
  * Answer checking
  * ===================================================================== */
 export function checkAnswer(ex, given) {

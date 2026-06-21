@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { COURSE, allLessons } from "../assets/js/curriculum.js";
 import {
   lessonParts, allParts, partById, buildSteps, practiceSteps, unitTestSteps,
-  checkAnswer, audioSlug, shuffle, helperNotes, helperGlossary
+  checkpointSteps, checkAnswer, audioSlug, shuffle, helperNotes, helperGlossary
 } from "../assets/js/lessons.js";
 
 const POOL = allLessons().flatMap((l) => l.vocab);
@@ -125,6 +125,22 @@ test("unitTestSteps covers the unit and stays within known words", () => {
   for (const s of steps) {
     if (s.type === "choose" || s.type === "listen") {
       for (const o of s.options) assert.ok(knownEn.has(clean(o)) || knownTl.has(clean(o)), `unit test option "${o}" taught`);
+    }
+  }
+});
+
+test("checkpointSteps mixes known words and never leaves the known set", () => {
+  const known = allParts().find((p) => p.id === "u2l2p2").known; // through unit 2
+  const sentences = COURSE.units.slice(0, 2).flatMap((u) => u.lessons.flatMap((l) => l.sentences || []));
+  const steps = checkpointSteps(known, sentences);
+  assert.ok(steps.length >= 8, "checkpoint is a heavier set");
+  assert.ok(steps.filter((s) => s.type === "match").length >= 1, "has mix & match");
+  assert.equal(steps.filter((s) => s.type === "teach" || s.type === "tip").length, 0);
+  const knownEn = new Set(known.map((w) => clean(w.en)));
+  const knownTl = new Set(known.map((w) => clean(w.tl)));
+  for (const s of steps) {
+    if (s.type === "choose" || s.type === "listen") {
+      for (const o of s.options) assert.ok(knownEn.has(clean(o)) || knownTl.has(clean(o)), `checkpoint option "${o}" taught`);
     }
   }
 });

@@ -450,3 +450,14 @@ b { font-weight: 800; }
 .help-row:last-child { border-bottom: none; }
 .help-row b { color: var(--teal); font-weight: 900; }
 .help-row span { font-size: .86rem; }
+
+/* ---------- Checkpoint (cumulative review) ---------- */
+.checkpoint { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  margin-top: 14px; padding: 15px 16px; border-radius: var(--radius); background: var(--card);
+  box-shadow: var(--shadow); border: 2px dashed var(--line); transition: transform .08s; }
+.checkpoint:active:not([disabled]) { transform: scale(.99); }
+.checkpoint.ready { border: 2px solid var(--teal); background: var(--good-bg); }
+.checkpoint.done { border: 2px solid var(--line); }
+.checkpoint.locked { opacity: .55; }
+.cp-ico { display: inline-flex; color: var(--teal); }
+.checkpoint.locked .cp-ico { color: var(--muted); }

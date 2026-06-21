@@ -105,6 +105,16 @@ test("passing a unit test unlocks the Unit Master achievement", () => {
   assert.ok(r.newAchievements.map((a) => a.id).includes("unit_master"));
 });
 
+test("checkpointResult records a review without completing lessons", () => {
+  const r = store.checkpointResult({ id: "cp1", title: "Checkpoint 1", correct: 8, total: 10 });
+  assert.equal(r.pct, 80);
+  assert.ok(r.xpGain > 0);
+  assert.ok(store.checkpointDone("cp1"));
+  assert.equal(store.checkpointBest("cp1"), 80);
+  assert.equal(store.completedCount(), 0); // lessons untouched
+  assert.ok(r.newAchievements.map((a) => a.id).includes("reviewer"));
+});
+
 test("levels: 100 XP per level", () => {
   assert.equal(store.level(), 1);
   store.state.xp = 250;

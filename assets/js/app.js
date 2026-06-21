@@ -8,7 +8,7 @@
 import { COURSE, allLessons, unitById } from "./curriculum.js";
 import { store, ACHIEVEMENTS } from "./store.js";
 import {
-  allParts, partById, buildSteps, practiceSteps, unitTestSteps, checkAnswer,
+  allParts, partById, buildSteps, practiceSteps, unitTestSteps, checkpointSteps, checkAnswer,
   speak, listen, canListen, canSpeak, shuffle, audioSlug, helperGlossary
 } from "./lessons.js";
 import { icon } from "./icons.js";
@@ -133,6 +133,9 @@ function renderHome() {
         <span class="ut-main"><span class="ut-title">Unit Test</span><span class="ut-sub">${utSub}</span></span>
       </button>`;
 
+    // Checkpoint — cumulative mixed review after every 2nd unit (≈ every 4 lessons)
+    const cpHtml = (ui + 1) % 2 === 0 ? checkpointNode(ui) : "";
+
     return `
       <section class="unit">
         <div class="unit-banner" style="background:${unit.color};color:${fg(unit.color)}">
@@ -141,7 +144,8 @@ function renderHome() {
         </div>
         <div class="path">${nodes}</div>
         ${utHtml}
-      </section>`;
+      </section>
+      ${cpHtml}`;
   }).join("");
 
   app.innerHTML = `
@@ -639,6 +643,91 @@ function finishUnitTest(unit, correct, total) {
 }
 
 /* =====================================================================
+ * CHECKPOINT — cumulative mixed review every few lessons (no hearts)
+ * ===================================================================== */
+function checkpointPartsThrough(ui) {
+  const upto = COURSE.units.slice(0, ui + 1).map((u) => u.id);
+  return PARTS.filter((p) => upto.includes(p.unitId));
+}
+
+function checkpointNode(ui) {
+  const id = "cp" + ui;
+  const num = Math.ceil((ui + 1) / 2);
+  const parts = checkpointPartsThrough(ui);
+  const allDone = parts.every((p) => store.isCompleted(p.id));
+  const done = store.checkpointDone(id);
+  const best = store.checkpointBest(id);
+  const cls = !allDone ? "locked" : done ? "done" : "ready";
+  const sub = !allDone ? "Finish the lessons above to unlock"
+    : done ? `Done${best ? ` · best ${best}%` : ""} — review again`
+    : "Mixed review of everything so far";
+  return `
+    <button class="checkpoint ${cls}" data-checkpoint="${ui}" ${allDone ? "" : "disabled"}>
+      <span class="cp-ico">${!allDone ? icon("lock", { size: 22 }) : icon("reset", { size: 24 })}</span>
+      <span class="ut-main"><span class="ut-title">Checkpoint ${num}</span><span class="ut-sub">${esc(sub)}</span></span>
+    </button>`;
+}
+
+function startCheckpoint(ui) {
+  const parts = checkpointPartsThrough(ui);
+  if (!parts.every((p) => store.isCompleted(p.id))) return;
+  const known = parts[parts.length - 1].known || POOL;
+  const sentences = COURSE.units.slice(0, ui + 1).flatMap((u) => u.lessons.flatMap((l) => l.sentences || []));
+  runCheckpoint(ui, checkpointSteps(known, sentences));
+}
+
+function runCheckpoint(ui, steps) {
+  const num = Math.ceil((ui + 1) / 2);
+  let i = 0, correct = 0;
+  const total = steps.length;
+  function paint() {
+    if (i >= total) return finishCheckpoint(ui, correct, total);
+    const pct = Math.round((i / total) * 100);
+    app.innerHTML = `
+      <div class="lesson-shell">
+        <div class="lesson-top">
+          <button class="icon-btn" data-act="quit">✕</button>
+          <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="practice-tag">Checkpoint ${num} · ${i + 1}/${total}</div>
+        </div>
+        <div class="lesson-body" id="exbody"></div>
+        <div class="lesson-foot" id="exfoot"></div>
+      </div>`;
+    app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit the checkpoint? Your progress in it won't be saved.")) go("home"); };
+    renderExercise(steps[i], app.querySelector("#exbody"), app.querySelector("#exfoot"),
+      (ok) => { if (ok) correct++; i++; paint(); }, () => {});
+  }
+  paint();
+}
+
+function finishCheckpoint(ui, correct, total) {
+  const num = Math.ceil((ui + 1) / 2);
+  const r = store.checkpointResult({ id: "cp" + ui, title: `Checkpoint ${num}`, correct, total });
+  const pct = r.pct;
+  const achHtml = r.newAchievements.length
+    ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
+       ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
+  app.innerHTML = `
+    <div class="center-screen finish">
+      <div class="confetti">🧠</div>
+      <h2>Memory refreshed!</h2>
+      <p class="muted">Checkpoint ${num} · mixed review</p>
+      <div class="result-cards">
+        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Score</div></div>
+        <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+      </div>
+      ${achHtml}
+      <div class="stack">
+        <button class="btn btn-primary" data-act="home">Back to lessons</button>
+        <button class="btn btn-ghost" data-act="again">Review again</button>
+      </div>
+    </div>`;
+  app.querySelector('[data-act="home"]').onclick = () => go("home");
+  app.querySelector('[data-act="again"]').onclick = () => startCheckpoint(ui);
+}
+
+/* =====================================================================
  * DASHBOARD
  * ===================================================================== */
 function renderDashboard() {
@@ -966,6 +1055,7 @@ app.addEventListener("click", (e) => {
   const tab = e.target.closest("[data-route]"); if (tab) return go(tab.dataset.route);
   const part = e.target.closest("[data-part]"); if (part && !part.disabled) return startPart(part.dataset.part);
   const utest = e.target.closest("[data-unittest]"); if (utest && !utest.disabled) return startUnitTest(utest.dataset.unittest);
+  const cp = e.target.closest("[data-checkpoint]"); if (cp && !cp.disabled) return startCheckpoint(Number(cp.dataset.checkpoint));
   const practice = e.target.closest("[data-practice]"); if (practice && !practice.disabled) return startPractice(practice.dataset.practice);
   const say = e.target.closest("[data-say]"); if (say) return speak(say.dataset.say);
   const hearts = e.target.closest('[data-act="hearts"]'); if (hearts) return go("hearts");
