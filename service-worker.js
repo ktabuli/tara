@@ -1,5 +1,5 @@
 /* Service worker — offline cache for Tara! Learn Tagalog (PWA) */
-const CACHE = "tara-tagalog-v17";
+const CACHE = "tara-tagalog-v18";
 const ASSETS = [
   "./",
   "./index.html",

@@ -469,7 +469,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         <div class="match-col">${left.map((x) => `<button class="match-item" data-side="L" data-key="${esc(x.k)}" data-match="${esc(x.match)}">${esc(x.k)}</button>`).join("")}</div>
         <div class="match-col">${right.map((x) => `<button class="match-item" data-side="R" data-key="${esc(x.k)}" data-match="${esc(x.match)}">${esc(x.k)}</button>`).join("")}</div>
       </div>`;
-    let selected = null, matched = 0, mistakes = 0;
+    let selected = null, matched = 0;
     body.querySelectorAll(".match-item").forEach((it) => {
       it.onclick = () => {
         if (it.classList.contains("matched")) return;
@@ -478,9 +478,10 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         const isMatch = selected.dataset.match === it.dataset.key && it.dataset.match === selected.dataset.key;
         if (isMatch) {
           [selected, it].forEach((x) => { x.classList.remove("selected"); x.classList.add("matched"); x.disabled = true; });
-          if (++matched === pairs.length) feedbackBar(foot, mistakes === 0, "All matched!", () => done(true));
+          // Matching only finishes when every pair is right, so it's always a win.
+          if (++matched === pairs.length) feedbackBar(foot, true, "All matched!", () => done(true));
         } else {
-          mistakes++; const a = selected, b = it;
+          const a = selected, b = it;
           a.classList.add("badmatch"); b.classList.add("badmatch");
           setTimeout(() => { a.classList.remove("badmatch", "selected"); b.classList.remove("badmatch"); }, 600);
         }
