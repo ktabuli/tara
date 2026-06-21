@@ -429,3 +429,10 @@ b { font-weight: 800; }
 .ut-main { display: flex; flex-direction: column; }
 .ut-title { font-weight: 900; font-size: 1rem; }
 .ut-sub { font-size: .78rem; color: var(--muted); margin-top: 1px; }
+
+/* helper-word footnote on sentence exercises */
+.ex-notes { display: flex; flex-direction: column; gap: 3px; margin: -6px 2px 18px;
+  padding: 10px 12px; background: var(--bg); border-radius: 12px; }
+.ex-notes-h { font-size: .64rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+.ex-note { font-size: .82rem; color: var(--ink); }
+.ex-note b { color: var(--teal); }

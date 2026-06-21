@@ -24,6 +24,32 @@ const sample = (arr, n) => shuffle(arr).slice(0, n);
 const norm = (s) => String(s).toLowerCase().trim().replace(/[.,!?¡¿'"]/g, "").replace(/\s+/g, " ");
 const STOP = new Set(["ang", "ng", "sa", "na", "po", "ko", "ka", "si", "ay", "at", "rin", "din", "lang", "mo", "ako", "kita", "ito", "kong"]);
 
+/* Short glosses for common Tagalog function/helper words, shown as a
+ * footnote on sentence exercises so learners aren't stumped by particles
+ * (e.g. "naman", "po") that aren't part of the vocabulary being taught. */
+const PARTICLE_GLOSS = {
+  po: "politeness marker", opo: "respectful “yes”",
+  naman: "softener — a gentle “well / though”",
+  rin: "too / also (after a vowel)", din: "too / also (after a consonant)",
+  na: "now / already", lang: "just / only", ba: "makes it a yes/no question",
+  ang: "“the” (subject marker)", ng: "of / object marker", sa: "to / at / in",
+  ay: "linker (formal word order)", ako: "I / me", ka: "you", mo: "your / you",
+  ko: "my / I", si: "name marker (before a person)", kita: "I … you",
+  tayo: "we / let’s", ito: "this", kong: "that I", pero: "but",
+  kasi: "because", tapos: "then", rin_din: "too / also"
+};
+
+/* Helper words present in a phrase, with their gloss (deduped, in order). */
+export function helperNotes(text) {
+  const seen = new Set();
+  const out = [];
+  for (const tok of String(text).split(/\s+/)) {
+    const w = tok.toLowerCase().replace(/[^a-zñ]/gi, "");
+    if (PARTICLE_GLOSS[w] && !seen.has(w)) { seen.add(w); out.push({ w, gloss: PARTICLE_GLOSS[w] }); }
+  }
+  return out;
+}
+
 /* ---------- distractors from across the course ---------- */
 function distractors(correct, key, pool, n = 3) {
   const others = pool.filter((v) => v[key] !== correct[key]);
@@ -120,14 +146,14 @@ function makeCloze(sentence, known) {
   const distract = sample(singles.filter((w) => norm(w) !== norm(answer)), 3).map(setCase);
   if (!distract.length) return null;
   return { type: "cloze", prompt: "Fill in the blank", display, en: sentence.en,
-    answer: setCase(answer), options: shuffle([setCase(answer), ...distract]) };
+    answer: setCase(answer), options: shuffle([setCase(answer), ...distract]), notes: helperNotes(sentence.tl) };
 }
 
 /* Tap-to-build a sentence (drag-and-drop equivalent) */
 function makeBuild(sentence) {
   const tokens = sentence.tl.split(" ");
   return { type: "build", prompt: "Tap the words in order", en: sentence.en,
-    tokens: shuffle(tokens.slice()), answer: tokens.join(" ") };
+    tokens: shuffle(tokens.slice()), answer: tokens.join(" "), notes: helperNotes(sentence.tl) };
 }
 
 /* =====================================================================
@@ -147,11 +173,15 @@ export function buildSteps(part, coursePool) {
     steps.push({ ...makeExercise("choose_en", sample(part.recapWords, 1)[0], pool), isRecap: true });
   }
 
-  // 3. teach each new word, then a quick game on it
-  words.forEach((w, j) => {
+  // 3. teach each new word, then a randomized game on it (varies every run,
+  //    but always covers the same words). Game types are skill-appropriate.
+  const gameTypes = part.skill === "writing" ? ["choose_en", "choose_tl", "write"]
+    : part.skill === "listening" ? ["listen", "choose_en", "choose_tl"]
+    : ["choose_en", "choose_tl", "listen"];
+  words.forEach((w) => {
     steps.push({ type: "teach", word: w });
-    steps.push(makeExercise(j % 2 === 0 ? "choose_en" : "choose_tl", w, pool));
-    if (j === 0) steps.push(makeExercise("listen", w, pool));
+    steps.push(makeExercise(sample(gameTypes, 1)[0], w, pool));
+    if (Math.random() < 0.45) steps.push(makeExercise(sample(gameTypes, 1)[0], w, pool));
   });
 
   // 4. fill in the blank (skip any sentence with no known word to blank)

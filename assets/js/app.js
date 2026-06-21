@@ -264,6 +264,12 @@ function feedbackBar(foot, ok, answerText, onNext, extra) {
   fb.querySelector('[data-act="next"]').onclick = onNext;
 }
 
+/* footnote glossing the helper words in a sentence exercise */
+function notesHtml(ex) {
+  if (!ex.notes || !ex.notes.length) return "";
+  return `<div class="ex-notes"><span class="ex-notes-h">Helper words</span>${ex.notes.map((n) => `<span class="ex-note"><b>${esc(n.w)}</b> — ${esc(n.gloss)}</span>`).join("")}</div>`;
+}
+
 /* ---------- scored exercises ---------- */
 function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   const word = ex.word;
@@ -307,6 +313,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         <div class="cloze-sentence">${esc(ex.display)}</div>
         <div class="cloze-en">${esc(ex.en)}</div>
       </div>
+      ${notesHtml(ex)}
       <div class="options">${ex.options.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
     let answered = false;
     body.querySelectorAll(".option").forEach((b) => {
@@ -330,6 +337,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
     body.innerHTML = `
       <div class="ex-prompt">${icon("build")} Tap the words in order</div>
       <div class="build-en">${esc(ex.en)}</div>
+      ${notesHtml(ex)}
       <div class="build-answer" id="buildAns"></div>
       <div class="build-bank" id="buildBank">
         ${ex.tokens.map((t, idx) => `<button class="tile" data-idx="${idx}">${esc(t)}</button>`).join("")}</div>`;

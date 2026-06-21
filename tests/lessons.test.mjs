@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { COURSE, allLessons } from "../assets/js/curriculum.js";
 import {
   lessonParts, allParts, partById, buildSteps, practiceSteps, unitTestSteps,
-  checkAnswer, audioSlug, shuffle
+  checkAnswer, audioSlug, shuffle, helperNotes
 } from "../assets/js/lessons.js";
 
 const POOL = allLessons().flatMap((l) => l.vocab);
@@ -153,6 +153,21 @@ test("checkAnswer (speak) accepts close/overlapping transcripts", () => {
   assert.equal(checkAnswer({ type: "speak", answer: "Salamat" }, "salamat"), true);
   assert.equal(checkAnswer({ type: "speak", answer: "Magandang umaga" }, ""), false);
   assert.equal(checkAnswer({ type: "speak", answer: "Magandang umaga" }, "kumusta"), false);
+});
+
+test("helperNotes glosses particles, and cloze/build carry them", () => {
+  const notes = helperNotes("Mabuti naman po");
+  const words = notes.map((n) => n.w);
+  assert.ok(words.includes("naman"), "explains naman");
+  assert.ok(words.includes("po"), "explains po");
+  for (const n of notes) assert.ok(n.gloss && n.gloss.length, "each note has a gloss");
+  assert.deepEqual(helperNotes("Bayanihan"), []); // a content word with no particles
+
+  // a generated cloze for u1l1 carries helper notes for the visible particles
+  const p = partById("u1l1p1");
+  let cloze = null;
+  for (let r = 0; r < 20 && !cloze; r++) cloze = buildSteps(p, []).find((s) => s.type === "cloze");
+  assert.ok(cloze && Array.isArray(cloze.notes), "cloze has notes");
 });
 
 test("audioSlug builds safe filenames", () => {
