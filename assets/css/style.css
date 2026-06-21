@@ -59,7 +59,7 @@ b { font-weight: 800; }
   background: var(--bg); padding: 6px 11px; border-radius: 999px; }
 .stat-ico { display: inline-flex; }
 .s-streak .stat-ico { color: var(--red); }
-.s-gems .stat-ico { color: var(--teal); }
+.s-gems .stat-ico, .s-skips .stat-ico { color: var(--teal); }
 .stat.hearts { color: var(--ink); }
 .stat.level-pill { margin-left: auto; color: var(--ink); }
 
@@ -284,6 +284,20 @@ b { font-weight: 800; }
 .feedback.good .fb-title { color: #066A75; }
 .feedback.bad .fb-title { color: #E24A50; }
 .fb-sub { font-size: .9rem; }
+.feedback.skip { background: #FFF6E2; }
+.feedback.skip .fb-ico { color: var(--gold-d); }
+.feedback.skip .fb-title { color: var(--gold-d); }
+.btn-skip { background: var(--gold); color: var(--ink); box-shadow: 0 4px 0 var(--gold-d); }
+
+/* "I don't know" skip control, shown between the exercise and the footer */
+.lesson-skip { padding-top: 12px; text-align: center; }
+.lesson-skip:empty { display: none; }
+.skip-btn { display: inline-flex; align-items: center; gap: 6px; background: none; border: none;
+  color: var(--muted); font: inherit; font-weight: 800; font-size: .85rem; padding: 8px 14px;
+  border-radius: 12px; cursor: pointer; }
+.skip-btn:active { background: var(--line); }
+.skip-btn .hi { color: var(--gold-d); }
+.skip-btn:disabled { opacity: .45; cursor: default; }
 
 /* finish screen */
 .center-screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;

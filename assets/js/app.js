@@ -102,7 +102,7 @@ function statsBar() {
   return `
     <header class="topbar">
       <div class="stat s-streak" title="Day streak"><span class="stat-ico">${icon("streak", { size: 20 })}</span><span class="stat-val">${s.streak}</span></div>
-      <div class="stat s-gems" title="Gems"><span class="stat-ico">${icon("gems", { size: 20 })}</span><span class="stat-val">${s.gems}</span></div>
+      <div class="stat s-skips" title="Skips — pass a question you don't know"><span class="stat-ico">${icon("skip", { size: 20 })}</span><span class="stat-val">${store.skips}</span></div>
       <div class="stat hearts" data-act="hearts" title="Hearts"><span class="stat-ico">${icon("hearts", { size: 20 })}</span><span class="stat-val">${store.hearts}</span></div>
       <div class="stat level-pill" title="Level ${store.level()}"><span class="stat-ico">${icon("level", { size: 20 })}</span><span class="stat-val">Lv ${store.level()}</span></div>
     </header>`;
@@ -229,10 +229,11 @@ function runPart(part, steps) {
           <div class="hearts-mini">${icon("hearts", { size: 20 })} ${store.hearts}</div>
         </div>
         <div class="lesson-body" id="exbody"></div>
+        <div class="lesson-skip" id="exskip"></div>
         <div class="lesson-foot" id="exfoot"></div>
       </div>`;
     app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit this lesson? Progress in it won't be saved.")) go("home"); };
-    return { body: app.querySelector("#exbody"), foot: app.querySelector("#exfoot") };
+    return { body: app.querySelector("#exbody"), foot: app.querySelector("#exfoot"), skip: app.querySelector("#exskip") };
   }
 
   function loseLife() {
@@ -250,10 +251,11 @@ function runPart(part, steps) {
   function paint() {
     if (i >= steps.length) return finishPart(part, correct, scored);
     const step = steps[i];
-    const { body, foot } = shell();
+    const { body, foot, skip } = shell();
     if (step.type === "tip") return renderTip(step.tip, body, foot, () => { i++; paint(); });
     if (step.type === "teach") return renderTeach(step.word, body, foot, () => { i++; paint(); });
     renderExercise(step, body, foot, next, loseLife);
+    if (step.type !== "match") renderSkip(skip, step, body, foot, next); // match can't be failed → no skip
   }
   paint();
 }
@@ -289,20 +291,50 @@ function renderTeach(w, body, foot, onNext) {
 }
 
 /* ---------- feedback bar ---------- */
-function feedbackBar(foot, ok, answerText, onNext, extra) {
+function feedbackBar(foot, ok, answerText, onNext, extra, skipped = false) {
+  // a skip control may be showing alongside the exercise — clear it
+  const sk = document.getElementById("exskip"); if (sk) sk.innerHTML = "";
+  const showAnswer = skipped || !ok;
+  const cls = skipped ? "skip" : ok ? "good" : "bad";
+  const ico = skipped ? icon("skip", { size: 26 }) : ok ? icon("check", { size: 26 }) : icon("cancel", { size: 26 });
+  const title = skipped ? "Skipped — here's the answer" : ok ? "Tama! (Correct)" : "Almost!";
   const fb = el(`
-    <div class="feedback ${ok ? "good" : "bad"}">
+    <div class="feedback ${cls}">
       <div class="fb-head">
-        <span class="fb-ico">${ok ? icon("check",{size:26}) : icon("cancel",{size:26})}</span>
+        <span class="fb-ico">${ico}</span>
         <div>
-          <div class="fb-title">${ok ? "Tama! (Correct)" : "Almost!"}</div>
-          ${ok ? (extra ? `<div class="fb-sub">${esc(extra)}</div>` : "") : `<div class="fb-sub">Answer: <b>${esc(answerText)}</b>${extra ? ` · ${esc(extra)}` : ""}</div>`}
+          <div class="fb-title">${title}</div>
+          ${showAnswer ? `<div class="fb-sub">Answer: <b>${esc(answerText)}</b>${extra ? ` · ${esc(extra)}` : ""}</div>` : (extra ? `<div class="fb-sub">${esc(extra)}</div>` : "")}
         </div>
       </div>
-      <button class="btn ${ok ? "btn-good" : "btn-bad"}" data-act="next">Continue</button>
+      <button class="btn ${skipped ? "btn-skip" : ok ? "btn-good" : "btn-bad"}" data-act="next">Continue</button>
     </div>`);
   foot.innerHTML = ""; foot.appendChild(fb);
   fb.querySelector('[data-act="next"]').onclick = onNext;
+}
+
+/* "I don't know" control shown under a scored exercise during a lesson.
+ * Spends a skip, reveals the answer (no heart lost), and moves on. */
+function renderSkip(slot, ex, body, foot, done) {
+  if (!slot) return;
+  const n = store.skips;
+  slot.innerHTML = `<button class="skip-btn" data-act="skip" ${n > 0 ? "" : "disabled"}>
+    ${icon("skip", { size: 16 })} I don't know ${n > 0 ? `· ${n} skip${n === 1 ? "" : "s"} left` : "· no skips left"}</button>`;
+  if (n <= 0) return;
+  const answer = ex.type === "quiz" ? ex.quiz.answer : ex.answer;
+  const extra = ex.type === "quiz" ? ex.quiz.explain : null;
+  const isCorrect = (val) => checkAnswer(ex.type === "quiz" ? { type: "choose", answer } : ex, val);
+  slot.querySelector('[data-act="skip"]').onclick = () => {
+    if (!store.useSkip()) return;
+    if (ex.word) store.recordMistake(ex.word); // resurface it in Review
+    body.querySelectorAll(".option, .tile, .match-item, .mic-btn").forEach((x) => (x.disabled = true));
+    body.querySelectorAll(".text-input").forEach((x) => { x.disabled = true; });
+    body.querySelectorAll(".option").forEach((x) => { if (isCorrect(x.dataset.val)) x.classList.add("correct"); });
+    const ce = body.querySelector("#clozeEn"); if (ce) ce.classList.remove("hidden");
+    const re = body.querySelector("#readingEn"); if (re) re.classList.remove("hidden");
+    if (answer) speak(answer);
+    feedbackBar(foot, false, answer, () => done(false), extra, true);
+  };
 }
 
 /* footnote glossing the helper words in a sentence exercise */
@@ -580,13 +612,13 @@ function outOfHearts(part) {
   app.innerHTML = `
     <div class="center-screen">
       <div class="big-emoji">💔</div><h2>Out of hearts</h2>
-      <p>You ran out of hearts. Refill to keep going, or come back later — hearts recharge over time.</p>
+      <p>Hearts recharge over time — come back soon. In the meantime you can keep practising in Review (no hearts needed). Tip: tap <b>I don't know</b> to spend a skip instead of guessing.</p>
       <div class="stack">
-        <button class="btn btn-primary" data-act="refill">💎 Refill (50 gems)</button>
+        <button class="btn btn-primary" data-act="review">Practise in Review</button>
         <button class="btn btn-ghost" data-act="home">Back to lessons</button>
       </div>
     </div>`;
-  app.querySelector('[data-act="refill"]').onclick = (e) => { if (store.buyHeartsWithGems()) startPart(part.id); else e.target.textContent = "Not enough gems 😅"; };
+  app.querySelector('[data-act="review"]').onclick = () => go("history");
   app.querySelector('[data-act="home"]').onclick = () => go("home");
 }
 
@@ -605,7 +637,7 @@ function finishPart(part, correct, total) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
       </div>
       ${achHtml}
       <div class="stack">
@@ -666,7 +698,7 @@ function finishUnitTest(unit, correct, total) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
       </div>
       <p class="muted small-text">${r.passed ? "You scored 80% or higher 🎉" : "You need 80% to pass — review your words and try again!"}</p>
       ${achHtml}
@@ -768,7 +800,7 @@ function finishReview(id, label, correct, total, restart) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
       </div>
       ${achHtml}
       <div class="stack">
@@ -998,7 +1030,7 @@ function finishPractice(mode, label, correct, total) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
       </div>
       ${mode === "mistakes" ? `<p class="muted">${left ? `${left} word${left > 1 ? "s" : ""} still to review` : "You cleared all your review words! 🎉"}</p>` : ""}
       ${achHtml}
@@ -1027,18 +1059,13 @@ function renderRewards() {
     <main class="screen">
       <h1 class="page-title">${icon("rewards")} Rewards</h1>
       <div class="card shop-card">
-        <div class="card-title gem-title">${icon("gems", { size: 20 })} ${s.gems} gems</div>
-        <p class="muted small-text">Earn gems by finishing parts. Better scores earn more.</p>
-        <button class="btn btn-primary" data-act="buyhearts">${icon("hearts", { size: 20 })} Refill hearts — 50 ${icon("gems", { size: 18 })}</button>
+        <div class="card-title gem-title">${icon("skip", { size: 20 })} ${store.skips} skip${store.skips === 1 ? "" : "s"}</div>
+        <p class="muted small-text">Skips let you pass a question you don't know — without losing a heart. You start with 3; earn more by finishing parts, checkpoints and unit tests. Better scores earn more.</p>
       </div>
       <div class="card"><div class="card-title">Achievements — ${s.achievements.length}/${ACHIEVEMENTS.length}</div>
         <div class="badges-grid">${achHtml}</div></div>
     </main>
     ${tabBar("rewards")}`;
-  app.querySelector('[data-act="buyhearts"]').onclick = (e) => {
-    if (store.buyHeartsWithGems()) { e.target.textContent = "Hearts refilled! ❤️"; setTimeout(render, 700); }
-    else e.target.textContent = store.hearts >= 5 ? "Hearts already full ❤️" : "Not enough gems 😅";
-  };
 }
 
 /* =====================================================================
@@ -1057,7 +1084,7 @@ function renderProfile() {
         <div class="summary-grid">
           <div><b>${s.xp}</b><span>XP</span></div><div><b>${store.level()}</b><span>Level</span></div>
           <div><b>${s.bestStreak}</b><span>Best streak</span></div><div><b>${store.completedCount()}</b><span>Parts</span></div>
-          <div><b>${s.achievements.length}</b><span>Badges</span></div><div><b>${s.gems}</b><span>Gems</span></div>
+          <div><b>${s.achievements.length}</b><span>Badges</span></div><div><b>${store.skips}</b><span>Skips</span></div>
         </div></div>
       <div class="card"><div class="card-title">Settings</div>
         <label class="setting-row"><span>${icon("audio",{size:18})} Speech speed</span><input type="range" min="0.5" max="1.2" step="0.05" value="${s.settings.ttsRate}" id="rate"></label>
@@ -1088,12 +1115,11 @@ function renderHearts() {
         <div class="big-hearts">${`<span class="hfull">${icon("hearts", { size: 40 })}</span>`.repeat(store.hearts)}${`<span class="hempty">${icon("hearts", { size: 40 })}</span>`.repeat(5 - store.hearts)}</div>
         <p>You have <b>${store.hearts}</b> of 5 hearts.</p>
         <p class="muted small-text">${store.hearts >= 5 ? "Hearts are full!" : `Next heart in about ${mins} min. Hearts also refill as you take lessons.`}</p>
-        <button class="btn btn-primary" data-act="buy">Refill now — 50 💎</button>
-        <button class="btn btn-ghost" data-act="back">Back</button>
+        <p class="muted small-text">Stuck on a question? Tap <b>I don't know</b> in a lesson to spend a skip instead of losing a heart.</p>
+        <button class="btn btn-primary" data-act="back">Back to lessons</button>
       </div>
     </main>
     ${tabBar("home")}`;
-  app.querySelector('[data-act="buy"]').onclick = (e) => { if (store.buyHeartsWithGems()) go("home"); else e.target.textContent = "Not enough gems 😅"; };
   app.querySelector('[data-act="back"]').onclick = () => go("home");
 }
 

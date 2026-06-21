@@ -1,7 +1,7 @@
 /* =====================================================================
  * store.js — Persistent learner state (localStorage)
  * ---------------------------------------------------------------------
- * Tracks XP, gems, hearts, daily streak, per-lesson completion history,
+ * Tracks XP, skips, hearts, daily streak, per-lesson completion history,
  * and unlocked achievements. Everything is saved to the browser so the
  * learner's progress survives reloads and works fully offline.
  * ===================================================================== */
@@ -12,7 +12,7 @@ const DAILY_GOAL_XP = 30; // XP to count a day toward the streak
 const DEFAULT_STATE = {
   createdAt: null,
   xp: 0,
-  gems: 0,
+  skips: 3,               // "I don't know" passes — start with 3, earn more like XP
   hearts: 5,
   heartsUpdatedAt: null,
   streak: 0,
@@ -117,16 +117,14 @@ class Store {
     this.save();
   }
 
-  buyHeartsWithGems() {
-    if (this.state.gems >= 50 && this.state.hearts < MAX_HEARTS) {
-      this.state.gems -= 50;
-      this.refillHearts();
-      return true;
-    }
+  get hearts() { this._regenHearts(); return this.state.hearts; }
+
+  /* --- skips ("I don't know" passes) --- */
+  get skips() { return this.state.skips; }
+  useSkip() {
+    if (this.state.skips > 0) { this.state.skips -= 1; this.save(); return true; }
     return false;
   }
-
-  get hearts() { this._regenHearts(); return this.state.hearts; }
 
   msUntilNextHeart() {
     if (this.state.hearts >= MAX_HEARTS) return 0;
@@ -141,7 +139,7 @@ class Store {
     const baseXp = 10;
     const bonus = Math.round(score * 10);
     const xpGain = baseXp + bonus;
-    const gemGain = stars === 3 ? 5 : stars === 2 ? 3 : 1;
+    const skipGain = stars === 3 ? 5 : stars === 2 ? 3 : 1;
 
     const prev = this.state.lessons[lessonId];
     this.state.lessons[lessonId] = {
@@ -152,7 +150,7 @@ class Store {
     };
 
     this.state.xp += xpGain;
-    this.state.gems += gemGain;
+    this.state.skips += skipGain;
 
     // Daily XP + streak handling
     const t = todayStr();
@@ -173,7 +171,7 @@ class Store {
 
     const newAchievements = this._checkAchievements();
     this.save();
-    return { xpGain, gemGain, stars, newAchievements };
+    return { xpGain, skipGain, stars, newAchievements };
   }
 
   /* --- mistakes (words to review) --- */
@@ -194,9 +192,9 @@ class Store {
   practiceResult({ correct, total, title }) {
     const score = total > 0 ? correct / total : 0;
     const xpGain = 5 + Math.round(score * 10);
-    const gemGain = score >= 0.8 ? 2 : 1;
+    const skipGain = score >= 0.8 ? 2 : 1;
     this.state.xp += xpGain;
-    this.state.gems += gemGain;
+    this.state.skips += skipGain;
 
     const t = todayStr();
     if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
@@ -212,7 +210,7 @@ class Store {
 
     const newAchievements = this._checkAchievements();
     this.save();
-    return { xpGain, gemGain, newAchievements };
+    return { xpGain, skipGain, newAchievements };
   }
 
   /* --- unit test (final assessment per unit; 80% to pass) --- */
@@ -221,9 +219,9 @@ class Store {
     const passed = pct >= 80;
     const stars = pct >= 95 ? 3 : pct >= 80 ? 2 : pct >= 60 ? 1 : 0;
     const xpGain = 20 + Math.round((pct / 100) * 30);
-    const gemGain = passed ? 10 : 3;
+    const skipGain = passed ? 10 : 3;
     this.state.xp += xpGain;
-    this.state.gems += gemGain;
+    this.state.skips += skipGain;
 
     const prev = this.state.unitTests[unitId];
     const firstPass = passed && !(prev && prev.passed);
@@ -248,7 +246,7 @@ class Store {
 
     const newAchievements = this._checkAchievements();
     this.save();
-    return { pct, passed, stars, xpGain, gemGain, firstPass, newAchievements };
+    return { pct, passed, stars, xpGain, skipGain, firstPass, newAchievements };
   }
   unitTestPassed(unitId) { return !!(this.state.unitTests[unitId] && this.state.unitTests[unitId].passed); }
   unitTestBest(unitId) { return this.state.unitTests[unitId]?.bestPct || 0; }
@@ -257,9 +255,9 @@ class Store {
   checkpointResult({ id, title, correct, total }) {
     const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
     const xpGain = 25 + Math.round((pct / 100) * 35);
-    const gemGain = 5 + (pct >= 80 ? 5 : 0);
+    const skipGain = 5 + (pct >= 80 ? 5 : 0);
     this.state.xp += xpGain;
-    this.state.gems += gemGain;
+    this.state.skips += skipGain;
 
     const prev = this.state.checkpoints[id];
     this.state.checkpoints[id] = {
@@ -281,7 +279,7 @@ class Store {
 
     const newAchievements = this._checkAchievements();
     this.save();
-    return { pct, xpGain, gemGain, newAchievements };
+    return { pct, xpGain, skipGain, newAchievements };
   }
   checkpointDone(id) { return !!(this.state.checkpoints[id] && this.state.checkpoints[id].done); }
   checkpointBest(id) { return this.state.checkpoints[id]?.bestPct || 0; }
@@ -330,7 +328,7 @@ export const ACHIEVEMENTS = [
   { id: "perfect", icon: "💯", title: "Flawless", desc: "Get 3 stars on a lesson", test: (s) => Object.values(s.lessons).some((l) => l.stars === 3) },
   { id: "ten_lessons", icon: "📚", title: "Bookworm", desc: "Complete 10 lessons", test: (s) => Object.keys(s.lessons).length >= 10 },
   { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => ["u2l2", "u3l2", "u4l2", "u6l1"].some((id) => Object.keys(s.lessons).some((k) => k.startsWith(id))) },
-  { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 },
+  { id: "gem_collector", icon: "⏭️", title: "Well Prepared", desc: "Build up 10 skips", test: (s) => s.skips >= 10 },
   { id: "unit_master", icon: "🎓", title: "Unit Master", desc: "Pass your first unit test", test: (s) => Object.values(s.unitTests || {}).some((u) => u.passed) },
   { id: "graduate", icon: "🏅", title: "Graduate", desc: "Pass all 6 unit tests", test: (s) => Object.values(s.unitTests || {}).filter((u) => u.passed).length >= 6 },
   { id: "reviewer", icon: "🧠", title: "Memory Master", desc: "Finish a checkpoint review", test: (s) => Object.keys(s.checkpoints || {}).length >= 1 }

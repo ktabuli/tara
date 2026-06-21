@@ -9,21 +9,25 @@ test("fresh state defaults", () => {
   assert.equal(store.hearts, 5);
   assert.equal(store.state.xp, 0);
   assert.equal(store.state.streak, 0);
-  assert.equal(store.state.gems, 0);
+  assert.equal(store.skips, 3); // start with 3 skips
   assert.equal(store.completedCount(), 0);
   assert.equal(store.mistakeList().length, 0);
 });
 
-test("hearts: lose, buy with gems", () => {
+test("hearts: lose decrements", () => {
   assert.equal(store.loseHeart(), 4);
   assert.equal(store.loseHeart(), 3);
+});
 
-  assert.equal(store.buyHeartsWithGems(), false); // not enough gems
-  store.state.gems = 50;
-  assert.equal(store.buyHeartsWithGems(), true);
-  assert.equal(store.hearts, 5);
-  assert.equal(store.state.gems, 0);
-  assert.equal(store.buyHeartsWithGems(), false); // already full
+test("skips: start at 3, useSkip decrements and floors at 0", () => {
+  assert.equal(store.skips, 3);
+  assert.equal(store.useSkip(), true);
+  assert.equal(store.skips, 2);
+  store.state.skips = 1;
+  assert.equal(store.useSkip(), true);
+  assert.equal(store.skips, 0);
+  assert.equal(store.useSkip(), false); // none left
+  assert.equal(store.skips, 0);
 });
 
 test("hearts regenerate over time", () => {
@@ -36,7 +40,7 @@ test("completeLesson: perfect score", () => {
   const r = store.completeLesson({ lessonId: "u1l1p1", title: "Greetings · 1", correct: 7, total: 7 });
   assert.equal(r.stars, 3);
   assert.equal(r.xpGain, 20);       // 10 base + 10 bonus
-  assert.equal(r.gemGain, 5);
+  assert.equal(r.skipGain, 5);
   assert.equal(store.state.xp, 20);
   assert.ok(store.isCompleted("u1l1p1"));
   assert.equal(store.completedCount(), 1);

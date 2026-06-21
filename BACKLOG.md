@@ -33,10 +33,15 @@ Severity: 🔴 breaks the core promise · 🟠 hurts the beginner on-ramp · �
       saved. Brutal on lesson 1 for a true beginner.
       → Save mid-part progress, and/or make the *first* lesson heartless.
       *(app.js `runPart`/`outOfHearts`, `store.loseHeart`.)*
-- [ ] **No "skip / I don't know" escape hatch.** Stuck on a cloze/write exercise,
-      the only path is guess-and-lose-a-heart. (Already noted in HANDOFF as
-      "skip after N tries".)
-      → Offer a reveal/skip after N wrong attempts (no heart on skip).
+- [x] **No "skip / I don't know" escape hatch.** ~~Stuck on a cloze/write
+      exercise, the only path is guess-and-lose-a-heart.~~ Done: replaced the
+      **gems** currency with **skips**. Every scored lesson question now shows an
+      "I don't know" button that spends a skip to reveal the answer with **no
+      heart lost** (records the word for Review). Learners start with **3 skips**
+      and earn more exactly where gems were earned (parts/practice/checkpoints/
+      unit tests). The gem→hearts shop was removed; hearts still regen over time,
+      and skips are the proactive tool to avoid running out.
+      *(store.js skips/useSkip; app.js `renderSkip`/`feedbackBar`/`runPart`.)*
 - [x] **Readings quiz untaught words.** ~~U3 jeepney ("**Trenta** pesos") and U5
       market ("**Singkwenta** pesos") expect decoding numbers never taught.~~
       Fixed: U3l2's fare question now tests "Bayad po / Para po!" (both taught).
