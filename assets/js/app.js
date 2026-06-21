@@ -373,6 +373,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         <button class="speaker-sm" data-act="play">${icon("audio",{size:18})} Listen</button>
         <div class="reading-en reveal hidden" id="readingEn"><span class="reveal-h">Translation</span>${esc(ex.en)}</div>
       </div>
+      ${notesHtml(ex)}
       <div class="reading-q">${esc(ex.q)}</div>
       <div class="options">${ex.options.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
     body.querySelector('[data-act="play"]').onclick = () => speak(ex.passage.replace(/\n/g, ". ").replace(/[A-Za-z]+:/g, ""));

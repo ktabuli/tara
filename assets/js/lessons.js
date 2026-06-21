@@ -213,7 +213,8 @@ export function buildSteps(part, coursePool) {
   // 8. reading comprehension (last part of a lesson)
   if (part.reading) {
     steps.push({ type: "reading", passage: part.reading.passage, en: part.reading.en,
-      q: part.reading.q, answer: part.reading.answer, options: shuffle(part.reading.options.slice()) });
+      q: part.reading.q, answer: part.reading.answer, options: shuffle(part.reading.options.slice()),
+      notes: helperNotes(part.reading.passage) });
   }
 
   // 9. recap review of this part's words
@@ -257,7 +258,8 @@ export function unitTestSteps(unit, coursePool) {
   const withReading = unit.lessons.find((l) => l.reading);
   if (withReading) {
     const r = withReading.reading;
-    steps.push({ type: "reading", passage: r.passage, en: r.en, q: r.q, answer: r.answer, options: shuffle(r.options.slice()) });
+    steps.push({ type: "reading", passage: r.passage, en: r.en, q: r.q, answer: r.answer,
+      options: shuffle(r.options.slice()), notes: helperNotes(r.passage) });
   }
   return shuffle(steps);
 }
