@@ -37,12 +37,13 @@ Severity: 🔴 breaks the core promise · 🟠 hurts the beginner on-ramp · �
       the only path is guess-and-lose-a-heart. (Already noted in HANDOFF as
       "skip after N tries".)
       → Offer a reveal/skip after N wrong attempts (no heart on skip).
-- [ ] **Readings quiz untaught words.** U3 jeepney ("**Trenta** pesos") and U5
-      market ("**Singkwenta** pesos") expect decoding numbers never taught
-      (only Isa/Dalawa/Tatlo exist). Contradicts the "only quiz taught words"
-      rule.
-      → Teach the Spanish-derived numbers, or pick passages using taught vocab.
-      *(curriculum.js u3l2 / u5l1 readings.)*
+- [x] **Readings quiz untaught words.** ~~U3 jeepney ("**Trenta** pesos") and U5
+      market ("**Singkwenta** pesos") expect decoding numbers never taught.~~
+      Fixed: U3l2's fare question now tests "Bayad po / Para po!" (both taught).
+      On inspection U5l1 ("What does the shopper ask for?" → Tawad) and U5l2
+      (→ Hapon) already derived their answers from taught vocab — the untaught
+      numbers were flavour only, translated on reveal, never quizzed.
+      *(curriculum.js u3l2 reading.)*
 
 ### 🟡 Polish & trust
 - [ ] **"Mabuhay" is never glossed.** The home banner greets with a word the

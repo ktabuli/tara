@@ -204,8 +204,8 @@ export const COURSE = {
           reading: {
             passage: "Pasahero: Magkano ang pamasahe?\nDrayber: Trenta pesos.\nPasahero: Bayad po. Para po!",
             en: "Passenger: How much is the fare? / Driver: Thirty pesos. / Passenger: Here's payment. Stop please!",
-            q: "What is the fare?",
-            options: ["30 pesos", "13 pesos", "50 pesos"], answer: "30 pesos"
+            q: "What does the passenger do at the end?",
+            options: ["Pays and asks to stop", "Gets on the jeepney", "Asks for directions"], answer: "Pays and asks to stop"
           },
           quiz: {
             type: "mc", q: "Which phrase tells a driver to stop so you can get off?",
