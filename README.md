@@ -12,7 +12,7 @@ Built around the project's overview notes:
 
 | # | Goal | How it's delivered |
 |---|------|--------------------|
-| 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, a learning path with unlockable lessons, stars per lesson, a **Unit Test** at the end of each unit (80% to pass), and celebratory finish screens |
+| 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, an unlockable learning path, stars per lesson, **required checkpoints** (a halfway review inside each unit + a cumulative review after every 2 units), a **Unit Test** per unit (80% to pass), and celebratory finish screens |
 | 2 | **Reading, writing, speech / conversation** | Interleaved flashcards + games: multiple-choice, type-the-translation, fill-in-the-blank (cloze), tap-to-build a sentence, match-the-pairs, reading-comprehension dialogues, listen-and-choose & speak-aloud (Web Speech API), plus a quiz per lesson. Lessons are split into bite-sized parts that open with a recap |
 | 3 | **Progress tracker / dashboard** | A **Stats** screen with KPIs, a 7-day activity chart, per-unit completion bars, and a skills breakdown |
 | 4 | **Mobile use** | Mobile-first responsive design, installable to the home screen, works offline, big touch targets, bottom tab bar |

@@ -269,13 +269,18 @@ export function unitTestSteps(unit, coursePool) {
  * the learner has seen so far. Lots of "mix & match" plus vocab, fill-
  * blank and build. `known` = all vocab learned up to this point.
  * ===================================================================== */
-export function checkpointSteps(known, sentences = []) {
+export function checkpointSteps(known, sentences = [], opts = {}) {
+  const { vocab = 14, matches = 3, focus = null } = opts;
   const pool = known;
   const steps = [];
   const types = ["choose_en", "choose_tl", "listen", "write"];
 
-  // vocab questions over a wide sample of learned words
-  shuffle(known).slice(0, 14).forEach((w) => steps.push(makeExercise(sample(types, 1)[0], w, pool)));
+  // vocab questions: prioritise focus words (if given), then fill from all known
+  const ordered = (focus && focus.length ? focus.slice() : []).concat(known);
+  const qWords = [];
+  const seen = new Set();
+  for (const w of shuffle(ordered)) { if (!seen.has(w.tl)) { seen.add(w.tl); qWords.push(w); } if (qWords.length >= vocab) break; }
+  qWords.forEach((w) => steps.push(makeExercise(sample(types, 1)[0], w, pool)));
 
   // a fill-in-the-blank and a build from learned-word sentences
   for (const s of shuffle(sentences)) { const cz = makeCloze(s, pool); if (cz) { steps.push(cz); break; } }
@@ -284,7 +289,7 @@ export function checkpointSteps(known, sentences = []) {
 
   // several "mix & match" rounds across different words
   const mw = shuffle(known);
-  for (let i = 0; i + 1 < mw.length && steps.filter((s) => s.type === "match").length < 3; i += 4) {
+  for (let i = 0; i + 1 < mw.length && steps.filter((s) => s.type === "match").length < matches; i += 4) {
     const group = mw.slice(i, i + 4);
     if (group.length >= 2) steps.push({ type: "match", pairs: group });
   }

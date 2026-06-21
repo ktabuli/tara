@@ -73,8 +73,26 @@ const SKILL_ICON = { reading: icon("reading"), writing: icon("writing"), speakin
 const UNIT_ICON = { u1: "chat", u2: "group", u3: "bus", u4: "dining", u5: "cart", u6: "hearts" };
 
 /* part index helpers (for unlock + progress) */
-function partIndex(id) { return PARTS.findIndex((p) => p.id === id); }
-function isUnlocked(id) { const i = partIndex(id); return i === 0 || (i > 0 && store.isCompleted(PARTS[i - 1].id)); }
+/* Ordered chain of everything that must be done in sequence: lesson parts,
+ * a required halfway checkpoint inside each unit, and a required cumulative
+ * checkpoint after every 2nd unit. Each item unlocks when the previous is done. */
+const GATES = (() => {
+  const g = [];
+  COURSE.units.forEach((u, ui) => {
+    const up = PARTS.filter((p) => p.unitId === u.id);
+    const half = Math.ceil(up.length / 2);
+    up.slice(0, half).forEach((p) => g.push({ kind: "part", id: p.id }));
+    g.push({ kind: "halfway", id: "hw" + u.id, unitIndex: ui });
+    up.slice(half).forEach((p) => g.push({ kind: "part", id: p.id }));
+    if ((ui + 1) % 2 === 0) g.push({ kind: "cumulative", id: "cp" + ui, unitIndex: ui });
+  });
+  return g;
+})();
+function gateDone(gt) { return gt.kind === "part" ? store.isCompleted(gt.id) : store.checkpointDone(gt.id); }
+function isUnlocked(id) {
+  const i = GATES.findIndex((g) => g.id === id);
+  return i === 0 || (i > 0 && gateDone(GATES[i - 1]));
+}
 
 /* =====================================================================
  * Top stats bar + bottom tab bar
@@ -104,11 +122,30 @@ function renderHome() {
 
   const unitsHtml = COURSE.units.map((unit, ui) => {
     const parts = PARTS.filter((p) => p.unitId === unit.id);
-    const nodes = parts.map((p, li) => {
+    const half = Math.ceil(parts.length / 2);
+    // path items in order: first-half parts → halfway checkpoint → second-half parts
+    const items = [
+      ...parts.slice(0, half).map((p) => ({ kind: "part", p })),
+      { kind: "halfway" },
+      ...parts.slice(half).map((p) => ({ kind: "part", p }))
+    ];
+    const nodes = items.map((it, li) => {
+      const offset = li % 2;
+      if (it.kind === "halfway") {
+        const hwId = "hw" + unit.id;
+        const done = store.checkpointDone(hwId);
+        const unlocked = isUnlocked(hwId);
+        return `
+          <button class="node checkpoint-node ${done ? "done" : unlocked ? "ready" : "locked"}"
+                  data-halfway="${unit.id}" ${unlocked ? "" : "disabled"}>
+            <span class="node-circle big">${done ? icon("check", { size: 40 }) : unlocked ? icon("reset", { size: 34 }) : icon("lock", { size: 30 })}</span>
+            <span class="node-title">Checkpoint</span>
+          </button>`;
+      }
+      const p = it.p;
       const done = store.isCompleted(p.id);
       const stars = store.lessonStars(p.id);
       const unlocked = isUnlocked(p.id);
-      const offset = li % 2;
       const label = p.partCount > 1 ? `${p.title} · ${p.part}` : p.title;
       return `
         <button class="node ${done ? "done" : unlocked ? "ready" : "locked"} pos-${offset}"
@@ -643,52 +680,70 @@ function finishUnitTest(unit, correct, total) {
 }
 
 /* =====================================================================
- * CHECKPOINT — cumulative mixed review every few lessons (no hearts)
+ * CHECKPOINTS — required reviews (no hearts)
+ *   • halfway: inside each unit (gates the unit's second half)
+ *   • cumulative: after every 2nd unit (gates the next unit)
  * ===================================================================== */
 function checkpointPartsThrough(ui) {
   const upto = COURSE.units.slice(0, ui + 1).map((u) => u.id);
   return PARTS.filter((p) => upto.includes(p.unitId));
 }
 
+/* the cumulative-checkpoint banner shown after a unit */
 function checkpointNode(ui) {
   const id = "cp" + ui;
   const num = Math.ceil((ui + 1) / 2);
-  const parts = checkpointPartsThrough(ui);
-  const allDone = parts.every((p) => store.isCompleted(p.id));
+  const unlocked = isUnlocked(id);
   const done = store.checkpointDone(id);
   const best = store.checkpointBest(id);
-  const cls = !allDone ? "locked" : done ? "done" : "ready";
-  const sub = !allDone ? "Finish the lessons above to unlock"
+  const cls = !unlocked ? "locked" : done ? "done" : "ready";
+  const sub = !unlocked ? "Finish the lessons above to unlock"
     : done ? `Done${best ? ` · best ${best}%` : ""} — review again`
-    : "Mixed review of everything so far";
+    : "Required · mixed review of everything so far";
   return `
-    <button class="checkpoint ${cls}" data-checkpoint="${ui}" ${allDone ? "" : "disabled"}>
-      <span class="cp-ico">${!allDone ? icon("lock", { size: 22 }) : icon("reset", { size: 24 })}</span>
+    <button class="checkpoint ${cls}" data-checkpoint="${ui}" ${unlocked ? "" : "disabled"}>
+      <span class="cp-ico">${!unlocked ? icon("lock", { size: 22 }) : icon("reset", { size: 24 })}</span>
       <span class="ut-main"><span class="ut-title">Checkpoint ${num}</span><span class="ut-sub">${esc(sub)}</span></span>
     </button>`;
 }
 
+/* cumulative checkpoint after unit index `ui` */
 function startCheckpoint(ui) {
+  const id = "cp" + ui;
+  if (!isUnlocked(id)) return;
   const parts = checkpointPartsThrough(ui);
-  if (!parts.every((p) => store.isCompleted(p.id))) return;
   const known = parts[parts.length - 1].known || POOL;
   const sentences = COURSE.units.slice(0, ui + 1).flatMap((u) => u.lessons.flatMap((l) => l.sentences || []));
-  runCheckpoint(ui, checkpointSteps(known, sentences));
+  const num = Math.ceil((ui + 1) / 2);
+  runReview(id, `Checkpoint ${num}`, checkpointSteps(known, sentences), () => startCheckpoint(ui));
 }
 
-function runCheckpoint(ui, steps) {
-  const num = Math.ceil((ui + 1) / 2);
+/* halfway checkpoint inside a unit */
+function startHalfway(unitId) {
+  const hwId = "hw" + unitId;
+  if (!isUnlocked(hwId)) return;
+  const unit = unitById(unitId);
+  const parts = PARTS.filter((p) => p.unitId === unitId);
+  const half = Math.ceil(parts.length / 2);
+  const known = parts[half - 1].known || POOL;             // everything learned up to the midpoint
+  const focus = parts.slice(0, half).flatMap((p) => p.words); // this unit's first-half words
+  const sentences = unit.lessons.flatMap((l) => l.sentences || []);
+  runReview(hwId, `${unit.title} — Checkpoint`, checkpointSteps(known, sentences, { vocab: 8, matches: 2, focus }), () => startHalfway(unitId));
+}
+
+/* shared player + results for any checkpoint review */
+function runReview(id, label, steps, restart) {
   let i = 0, correct = 0;
   const total = steps.length;
   function paint() {
-    if (i >= total) return finishCheckpoint(ui, correct, total);
+    if (i >= total) return finishReview(id, label, correct, total, restart);
     const pct = Math.round((i / total) * 100);
     app.innerHTML = `
       <div class="lesson-shell">
         <div class="lesson-top">
           <button class="icon-btn" data-act="quit">✕</button>
           <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-          <div class="practice-tag">Checkpoint ${num} · ${i + 1}/${total}</div>
+          <div class="practice-tag">${esc(label)} · ${i + 1}/${total}</div>
         </div>
         <div class="lesson-body" id="exbody"></div>
         <div class="lesson-foot" id="exfoot"></div>
@@ -700,10 +755,8 @@ function runCheckpoint(ui, steps) {
   paint();
 }
 
-function finishCheckpoint(ui, correct, total) {
-  const num = Math.ceil((ui + 1) / 2);
-  const r = store.checkpointResult({ id: "cp" + ui, title: `Checkpoint ${num}`, correct, total });
-  const pct = r.pct;
+function finishReview(id, label, correct, total, restart) {
+  const r = store.checkpointResult({ id, title: label, correct, total });
   const achHtml = r.newAchievements.length
     ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
        ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
@@ -711,20 +764,20 @@ function finishCheckpoint(ui, correct, total) {
     <div class="center-screen finish">
       <div class="confetti">🧠</div>
       <h2>Memory refreshed!</h2>
-      <p class="muted">Checkpoint ${num} · mixed review</p>
+      <p class="muted">${esc(label)}</p>
       <div class="result-cards">
-        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Score</div></div>
+        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
         <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
       ${achHtml}
       <div class="stack">
-        <button class="btn btn-primary" data-act="home">Back to lessons</button>
+        <button class="btn btn-primary" data-act="home">Continue</button>
         <button class="btn btn-ghost" data-act="again">Review again</button>
       </div>
     </div>`;
   app.querySelector('[data-act="home"]').onclick = () => go("home");
-  app.querySelector('[data-act="again"]').onclick = () => startCheckpoint(ui);
+  app.querySelector('[data-act="again"]').onclick = restart;
 }
 
 /* =====================================================================
@@ -1056,6 +1109,7 @@ app.addEventListener("click", (e) => {
   const part = e.target.closest("[data-part]"); if (part && !part.disabled) return startPart(part.dataset.part);
   const utest = e.target.closest("[data-unittest]"); if (utest && !utest.disabled) return startUnitTest(utest.dataset.unittest);
   const cp = e.target.closest("[data-checkpoint]"); if (cp && !cp.disabled) return startCheckpoint(Number(cp.dataset.checkpoint));
+  const hw = e.target.closest("[data-halfway]"); if (hw && !hw.disabled) return startHalfway(hw.dataset.halfway);
   const practice = e.target.closest("[data-practice]"); if (practice && !practice.disabled) return startPractice(practice.dataset.practice);
   const say = e.target.closest("[data-say]"); if (say) return speak(say.dataset.say);
   const hearts = e.target.closest('[data-act="hearts"]'); if (hearts) return go("hearts");

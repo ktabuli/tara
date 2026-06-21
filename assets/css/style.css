@@ -461,3 +461,17 @@ b { font-weight: 800; }
 .checkpoint.locked { opacity: .55; }
 .cp-ico { display: inline-flex; color: var(--teal); }
 .checkpoint.locked .cp-ico { color: var(--muted); }
+
+/* ---------- halfway checkpoint node (emphasised circle on the path) ---------- */
+.checkpoint-node { align-self: center !important; transform: none !important; width: 150px; margin: 6px 0; }
+.checkpoint-node:active:not([disabled]) { transform: scale(.95) !important; }
+.node-circle.big { width: 90px; height: 90px; font-size: 2.1rem; border: 3px solid var(--card); }
+.checkpoint-node .node-circle { background: linear-gradient(135deg, var(--gold), var(--gold-d)); color: #2A2C24;
+  box-shadow: 0 6px 0 var(--gold-d), var(--shadow-lg); }
+.checkpoint-node.ready .node-circle { animation: bob 2.4s ease-in-out infinite; }
+.checkpoint-node.done .node-circle { background: linear-gradient(135deg, var(--teal), var(--blue)); color: #FEFDFF;
+  box-shadow: 0 6px 0 var(--teal-d), var(--shadow); }
+.checkpoint-node.locked .node-circle { background: #E2E3DE; color: #A2A79B; box-shadow: 0 6px 0 #C9CBC2; }
+.checkpoint-node .node-title { font-weight: 900; font-size: .82rem; color: var(--gold-d); text-transform: uppercase; letter-spacing: .04em; }
+.checkpoint-node.done .node-title { color: var(--teal); }
+.checkpoint-node.locked .node-title { color: var(--muted); }
