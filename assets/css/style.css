@@ -436,3 +436,17 @@ b { font-weight: 800; }
 .ex-notes-h { font-size: .64rem; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .ex-note { font-size: .82rem; color: var(--ink); }
 .ex-note b { color: var(--teal); }
+
+/* translation revealed only after answering */
+.reveal { animation: fadein .25s; }
+.reveal-h { display: block; font-size: .62rem; font-weight: 900; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--muted); margin-bottom: 2px; }
+@keyframes fadein { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; } }
+
+/* helper-words reference (Review tab) */
+.help-list { display: flex; flex-direction: column; }
+.help-row { display: grid; grid-template-columns: 96px 1fr; gap: 10px; align-items: baseline;
+  padding: 8px 2px; border-bottom: 1px solid var(--line); }
+.help-row:last-child { border-bottom: none; }
+.help-row b { color: var(--teal); font-weight: 900; }
+.help-row span { font-size: .86rem; }

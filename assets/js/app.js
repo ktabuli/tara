@@ -9,7 +9,7 @@ import { COURSE, allLessons, unitById } from "./curriculum.js";
 import { store, ACHIEVEMENTS } from "./store.js";
 import {
   allParts, partById, buildSteps, practiceSteps, unitTestSteps, checkAnswer,
-  speak, listen, canListen, canSpeak, shuffle, audioSlug
+  speak, listen, canListen, canSpeak, shuffle, audioSlug, helperGlossary
 } from "./lessons.js";
 import { icon } from "./icons.js";
 
@@ -311,7 +311,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       <div class="ex-prompt">${icon("blank")} Fill in the blank</div>
       <div class="ex-question cloze-q">
         <div class="cloze-sentence">${esc(ex.display)}</div>
-        <div class="cloze-en">${esc(ex.en)}</div>
+        <div class="cloze-en reveal hidden" id="clozeEn">${esc(ex.en)}</div>
       </div>
       ${notesHtml(ex)}
       <div class="options">${ex.options.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
@@ -324,6 +324,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) { loseLife(); body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); }); }
         body.querySelectorAll(".option").forEach((x) => (x.disabled = true));
+        body.querySelector("#clozeEn").classList.remove("hidden"); // reveal translation after answering
         speak(ex.answer);
         feedbackBar(foot, ok, ex.answer, () => done(ok));
       };
@@ -370,7 +371,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
       <div class="reading-card">
         <div class="reading-passage">${ex.passage.split("\n").map((l) => `<div>${esc(l)}</div>`).join("")}</div>
         <button class="speaker-sm" data-act="play">${icon("audio",{size:18})} Listen</button>
-        <div class="reading-en">${esc(ex.en)}</div>
+        <div class="reading-en reveal hidden" id="readingEn"><span class="reveal-h">Translation</span>${esc(ex.en)}</div>
       </div>
       <div class="reading-q">${esc(ex.q)}</div>
       <div class="options">${ex.options.map((o) => `<button class="option" data-val="${esc(o)}">${esc(o)}</button>`).join("")}</div>`;
@@ -384,6 +385,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
         b.classList.add(ok ? "correct" : "wrong");
         if (!ok) { loseLife(); body.querySelectorAll(".option").forEach((x) => { if (checkAnswer(ex, x.dataset.val)) x.classList.add("correct"); }); }
         body.querySelectorAll(".option").forEach((x) => (x.disabled = true));
+        body.querySelector("#readingEn").classList.remove("hidden"); // reveal translation after answering
         feedbackBar(foot, ok, ex.answer, () => done(ok));
       };
     });
@@ -775,6 +777,12 @@ function renderHistory() {
           </div>
           <div class="muted small-text gloss-empty hidden" id="glossEmpty">No words match your search.</div>
         ` : `<div class="muted">Finish a lesson to start building your word list.</div>`}
+      </div>
+
+      <div class="card">
+        <div class="card-title">Helper words</div>
+        <p class="muted small-text">The little words (particles) that glue Tagalog sentences together.</p>
+        <div class="help-list">${helperGlossary().map((g) => `<div class="help-row"><b>${esc(g.w)}</b><span>${esc(g.gloss)}</span></div>`).join("")}</div>
       </div>
 
       <div class="card"><div class="card-title">Recent activity</div><div class="recent-list">${recent}</div></div>

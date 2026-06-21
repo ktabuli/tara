@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { COURSE, allLessons } from "../assets/js/curriculum.js";
 import {
   lessonParts, allParts, partById, buildSteps, practiceSteps, unitTestSteps,
-  checkAnswer, audioSlug, shuffle, helperNotes
+  checkAnswer, audioSlug, shuffle, helperNotes, helperGlossary
 } from "../assets/js/lessons.js";
 
 const POOL = allLessons().flatMap((l) => l.vocab);
@@ -168,6 +168,14 @@ test("helperNotes glosses particles, and cloze/build carry them", () => {
   let cloze = null;
   for (let r = 0; r < 20 && !cloze; r++) cloze = buildSteps(p, []).find((s) => s.type === "cloze");
   assert.ok(cloze && Array.isArray(cloze.notes), "cloze has notes");
+});
+
+test("helperGlossary returns an alphabetised reference", () => {
+  const g = helperGlossary();
+  assert.ok(g.length >= 10);
+  for (const e of g) assert.ok(e.w && e.gloss);
+  const ws = g.map((e) => e.w);
+  assert.deepEqual(ws, ws.slice().sort());
 });
 
 test("audioSlug builds safe filenames", () => {

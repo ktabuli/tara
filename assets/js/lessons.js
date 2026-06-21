@@ -36,7 +36,7 @@ const PARTICLE_GLOSS = {
   ay: "linker (formal word order)", ako: "I / me", ka: "you", mo: "your / you",
   ko: "my / I", si: "name marker (before a person)", kita: "I … you",
   tayo: "we / let’s", ito: "this", kong: "that I", pero: "but",
-  kasi: "because", tapos: "then", rin_din: "too / also"
+  kasi: "because", tapos: "then"
 };
 
 /* Helper words present in a phrase, with their gloss (deduped, in order). */
@@ -48,6 +48,11 @@ export function helperNotes(text) {
     if (PARTICLE_GLOSS[w] && !seen.has(w)) { seen.add(w); out.push({ w, gloss: PARTICLE_GLOSS[w] }); }
   }
   return out;
+}
+
+/* The full helper-word glossary, alphabetised (for the Review reference). */
+export function helperGlossary() {
+  return Object.entries(PARTICLE_GLOSS).map(([w, gloss]) => ({ w, gloss })).sort((a, b) => a.w.localeCompare(b.w));
 }
 
 /* ---------- distractors from across the course ---------- */
