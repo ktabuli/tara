@@ -24,6 +24,7 @@ const DEFAULT_STATE = {
   history: [],            // [{ lessonId, title, score, total, xp, at }]
   achievements: [],       // [achievementId]
   mistakes: {},           // { [tl]: { tl, en, say, emoji, misses, at } } — words to review
+  unitTests: {},          // { [unitId]: { bestPct, passed, attempts, at } }
   settings: { sound: true, ttsRate: 0.85 }
 };
 
@@ -213,6 +214,44 @@ class Store {
     return { xpGain, gemGain, newAchievements };
   }
 
+  /* --- unit test (final assessment per unit; 80% to pass) --- */
+  unitTestResult({ unitId, title, correct, total }) {
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const passed = pct >= 80;
+    const stars = pct >= 95 ? 3 : pct >= 80 ? 2 : pct >= 60 ? 1 : 0;
+    const xpGain = 20 + Math.round((pct / 100) * 30);
+    const gemGain = passed ? 10 : 3;
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const prev = this.state.unitTests[unitId];
+    const firstPass = passed && !(prev && prev.passed);
+    this.state.unitTests[unitId] = {
+      bestPct: Math.max(pct, prev?.bestPct || 0),
+      passed: passed || !!(prev && prev.passed),
+      attempts: (prev?.attempts || 0) + 1,
+      at: Date.now()
+    };
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "unittest:" + unitId, title, score: correct, total, xp: xpGain, stars, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { pct, passed, stars, xpGain, gemGain, firstPass, newAchievements };
+  }
+  unitTestPassed(unitId) { return !!(this.state.unitTests[unitId] && this.state.unitTests[unitId].passed); }
+  unitTestBest(unitId) { return this.state.unitTests[unitId]?.bestPct || 0; }
+
   /* --- progress helpers --- */
   isCompleted(lessonId) { return !!this.state.lessons[lessonId]; }
   lessonStars(lessonId) { return this.state.lessons[lessonId]?.stars || 0; }
@@ -257,7 +296,9 @@ export const ACHIEVEMENTS = [
   { id: "perfect", icon: "💯", title: "Flawless", desc: "Get 3 stars on a lesson", test: (s) => Object.values(s.lessons).some((l) => l.stars === 3) },
   { id: "ten_lessons", icon: "📚", title: "Bookworm", desc: "Complete 10 lessons", test: (s) => Object.keys(s.lessons).length >= 10 },
   { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => ["u2l2", "u3l2", "u4l2", "u6l1"].some((id) => Object.keys(s.lessons).some((k) => k.startsWith(id))) },
-  { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 }
+  { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 },
+  { id: "unit_master", icon: "🎓", title: "Unit Master", desc: "Pass your first unit test", test: (s) => Object.values(s.unitTests || {}).some((u) => u.passed) },
+  { id: "graduate", icon: "🏅", title: "Graduate", desc: "Pass all 6 unit tests", test: (s) => Object.values(s.unitTests || {}).filter((u) => u.passed).length >= 6 }
 ];
 
 export const store = new Store();

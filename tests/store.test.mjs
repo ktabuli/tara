@@ -80,6 +80,31 @@ test("practiceResult awards XP but never completes a lesson", () => {
   assert.ok(store.state.xp > 0);
 });
 
+test("unitTestResult: pass at >=80%, keeps best, stays passed after a worse retake", () => {
+  let r = store.unitTestResult({ unitId: "u1", title: "U1 test", correct: 9, total: 10 }); // 90%
+  assert.equal(r.pct, 90);
+  assert.ok(r.passed);
+  assert.ok(r.firstPass);
+  assert.equal(store.unitTestPassed("u1"), true);
+  assert.equal(store.unitTestBest("u1"), 90);
+
+  r = store.unitTestResult({ unitId: "u1", title: "U1 test", correct: 5, total: 10 }); // 50% retake
+  assert.equal(r.passed, false);                 // this attempt failed
+  assert.equal(store.unitTestBest("u1"), 90);    // best retained
+  assert.equal(store.unitTestPassed("u1"), true); // still passed overall
+});
+
+test("unitTestResult below 80% does not pass", () => {
+  const r = store.unitTestResult({ unitId: "u3", title: "x", correct: 7, total: 10 }); // 70%
+  assert.equal(r.passed, false);
+  assert.equal(store.unitTestPassed("u3"), false);
+});
+
+test("passing a unit test unlocks the Unit Master achievement", () => {
+  const r = store.unitTestResult({ unitId: "u1", title: "x", correct: 10, total: 10 });
+  assert.ok(r.newAchievements.map((a) => a.id).includes("unit_master"));
+});
+
 test("levels: 100 XP per level", () => {
   assert.equal(store.level(), 1);
   store.state.xp = 250;

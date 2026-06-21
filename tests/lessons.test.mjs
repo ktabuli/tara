@@ -1,9 +1,9 @@
 import "./helpers/setup.mjs";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { allLessons } from "../assets/js/curriculum.js";
+import { COURSE, allLessons } from "../assets/js/curriculum.js";
 import {
-  lessonParts, allParts, partById, buildSteps, practiceSteps,
+  lessonParts, allParts, partById, buildSteps, practiceSteps, unitTestSteps,
   checkAnswer, audioSlug, shuffle
 } from "../assets/js/lessons.js";
 
@@ -65,7 +65,7 @@ test("buildSteps produces a valid interleaved sequence (invariants over many run
 
       for (const s of steps) {
         if (s.type === "choose" || s.type === "listen") {
-          assert.equal(s.options.length, 4, `${p.id} ${s.type} has 4 options`);
+          assert.ok(s.options.length >= 2 && s.options.length <= 4, `${p.id} ${s.type} has 2-4 options`);
           assert.ok(s.options.includes(s.answer), `${p.id} ${s.type} answer in options`);
         }
         if (s.type === "cloze") {
@@ -83,6 +83,48 @@ test("buildSteps produces a valid interleaved sequence (invariants over many run
           assert.ok(s.pairs.length >= 2, `${p.id} match has pairs`);
         }
       }
+    }
+  }
+});
+
+const clean = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+
+test("exercises never use words the learner hasn't been introduced to", () => {
+  for (const p of allParts()) {
+    const knownEn = new Set(p.known.map((w) => clean(w.en)));
+    const knownTl = new Set(p.known.map((w) => clean(w.tl)));
+    for (let run = 0; run < 20; run++) {
+      for (const s of buildSteps(p, [])) {
+        if (s.type === "choose" || s.type === "listen") {
+          for (const o of s.options) {
+            assert.ok(knownEn.has(clean(o)) || knownTl.has(clean(o)),
+              `${p.id}: option "${o}" must be a taught word`);
+          }
+        }
+        if (s.type === "cloze") {
+          assert.ok(knownTl.has(clean(s.answer)), `${p.id}: cloze answer "${s.answer}" must be taught`);
+          for (const o of s.options) assert.ok(knownTl.has(clean(o)), `${p.id}: cloze option "${o}" must be taught`);
+        }
+      }
+    }
+  }
+});
+
+test("unitTestSteps covers the unit and stays within known words", () => {
+  const unit = COURSE.units[1]; // Social Interactions
+  const parts = allParts().filter((p) => p.unitId === unit.id);
+  const known = parts[parts.length - 1].known;
+  const steps = unitTestSteps(unit, known);
+
+  assert.equal(steps.filter((s) => s.type === "quiz").length, unit.lessons.filter((l) => l.quiz).length);
+  assert.ok(steps.some((s) => ["choose", "listen", "write"].includes(s.type)));
+  assert.equal(steps.filter((s) => s.type === "teach").length, 0);
+
+  const knownEn = new Set(known.map((w) => clean(w.en)));
+  const knownTl = new Set(known.map((w) => clean(w.tl)));
+  for (const s of steps) {
+    if (s.type === "choose" || s.type === "listen") {
+      for (const o of s.options) assert.ok(knownEn.has(clean(o)) || knownTl.has(clean(o)), `unit test option "${o}" taught`);
     }
   }
 });

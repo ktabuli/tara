@@ -414,3 +414,18 @@ b { font-weight: 800; }
   font-size: .62rem; font-weight: 900; text-transform: uppercase; letter-spacing: .03em;
   color: var(--teal); background: var(--good-bg); padding: 2px 7px; border-radius: 999px; vertical-align: middle; }
 .rec-chip .hi { color: var(--teal); }
+
+/* ---------- Unit test (final assessment) ---------- */
+.unit-test { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  margin-top: 14px; padding: 15px 16px; border-radius: var(--radius); background: var(--card);
+  box-shadow: var(--shadow); border: 2px dashed var(--line); transition: transform .08s; }
+.unit-test:active:not([disabled]) { transform: scale(.99); }
+.unit-test.ready { border: 2px solid var(--gold); background: #FFF6E2; }
+.unit-test.passed { border: 2px solid var(--teal); background: var(--good-bg); }
+.unit-test.locked { opacity: .55; }
+.ut-ico { display: inline-flex; color: var(--gold-d); }
+.unit-test.passed .ut-ico { color: var(--teal); }
+.unit-test.locked .ut-ico { color: var(--muted); }
+.ut-main { display: flex; flex-direction: column; }
+.ut-title { font-weight: 900; font-size: 1rem; }
+.ut-sub { font-size: .78rem; color: var(--muted); margin-top: 1px; }

@@ -8,7 +8,7 @@
 import { COURSE, allLessons, unitById } from "./curriculum.js";
 import { store, ACHIEVEMENTS } from "./store.js";
 import {
-  allParts, partById, buildSteps, practiceSteps, checkAnswer,
+  allParts, partById, buildSteps, practiceSteps, unitTestSteps, checkAnswer,
   speak, listen, canListen, canSpeak, shuffle, audioSlug
 } from "./lessons.js";
 import { icon } from "./icons.js";
@@ -118,6 +118,21 @@ function renderHome() {
           <span class="node-title">${esc(label)}</span>
         </button>`;
     }).join("");
+
+    // Unit test — final assessment, unlocks once every part in the unit is done
+    const allDone = parts.every((p) => store.isCompleted(p.id));
+    const passed = store.unitTestPassed(unit.id);
+    const best = store.unitTestBest(unit.id);
+    const utCls = !allDone ? "locked" : passed ? "passed" : "ready";
+    const utSub = !allDone ? "Finish the lessons to unlock"
+      : passed ? `Passed${best ? ` · best ${best}%` : ""} — tap to retake`
+      : "Test everything in this unit";
+    const utHtml = `
+      <button class="unit-test ${utCls}" data-unittest="${unit.id}" ${allDone ? "" : "disabled"}>
+        <span class="ut-ico">${!allDone ? icon("lock", { size: 22 }) : passed ? icon("check", { size: 24 }) : icon("rewards", { size: 24 })}</span>
+        <span class="ut-main"><span class="ut-title">Unit Test</span><span class="ut-sub">${utSub}</span></span>
+      </button>`;
+
     return `
       <section class="unit">
         <div class="unit-banner" style="background:${unit.color};color:${fg(unit.color)}">
@@ -125,6 +140,7 @@ function renderHome() {
           <div class="unit-name">${icon(UNIT_ICON[unit.id] || "reading", { size: 24 })} ${esc(unit.title)}</div></div>
         </div>
         <div class="path">${nodes}</div>
+        ${utHtml}
       </section>`;
   }).join("");
 
@@ -549,6 +565,68 @@ function finishPart(part, correct, total) {
 }
 
 /* =====================================================================
+ * UNIT TEST — final assessment for a whole unit (no hearts; 80% to pass)
+ * ===================================================================== */
+function startUnitTest(unitId) {
+  const unit = unitById(unitId);
+  if (!unit) return;
+  const parts = PARTS.filter((p) => p.unitId === unitId);
+  if (!parts.every((p) => store.isCompleted(p.id))) return; // still locked
+  const known = parts[parts.length - 1].known || POOL; // everything learned through this unit
+  runUnitTest(unit, unitTestSteps(unit, known));
+}
+
+function runUnitTest(unit, steps) {
+  let i = 0, correct = 0;
+  const total = steps.length;
+  function paint() {
+    if (i >= total) return finishUnitTest(unit, correct, total);
+    const pct = Math.round((i / total) * 100);
+    app.innerHTML = `
+      <div class="lesson-shell">
+        <div class="lesson-top">
+          <button class="icon-btn" data-act="quit">✕</button>
+          <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
+          <div class="practice-tag">Unit Test · ${i + 1}/${total}</div>
+        </div>
+        <div class="lesson-body" id="exbody"></div>
+        <div class="lesson-foot" id="exfoot"></div>
+      </div>`;
+    app.querySelector('[data-act="quit"]').onclick = () => { if (confirm("Quit the unit test? Your score won't be saved.")) go("home"); };
+    renderExercise(steps[i], app.querySelector("#exbody"), app.querySelector("#exfoot"),
+      (ok) => { if (ok) correct++; i++; paint(); }, () => {}); // no hearts in a test
+  }
+  paint();
+}
+
+function finishUnitTest(unit, correct, total) {
+  const r = store.unitTestResult({ unitId: unit.id, title: `${unit.title} — Unit Test`, correct, total });
+  const achHtml = r.newAchievements.length
+    ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
+       ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
+  app.innerHTML = `
+    <div class="center-screen finish">
+      <div class="confetti">${r.passed ? "🏆" : "📝"}</div>
+      ${r.passed ? `<div class="stars-row">${[1, 2, 3].map((n) => `<span class="fstar ${n <= r.stars ? "on" : ""}">★</span>`).join("")}</div>` : ""}
+      <h2>${r.passed ? "Unit passed!" : "Almost there!"}</h2>
+      <p class="muted">${esc(unit.title)}</p>
+      <div class="result-cards">
+        <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
+        <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
+      </div>
+      <p class="muted small-text">${r.passed ? "You scored 80% or higher 🎉" : "You need 80% to pass — review your words and try again!"}</p>
+      ${achHtml}
+      <div class="stack">
+        <button class="btn btn-primary" data-act="home">Back to lessons</button>
+        <button class="btn btn-ghost" data-act="retry">${r.passed ? "Retake test" : "Try again"}</button>
+      </div>
+    </div>`;
+  app.querySelector('[data-act="home"]').onclick = () => go("home");
+  app.querySelector('[data-act="retry"]').onclick = () => startUnitTest(unit.id);
+}
+
+/* =====================================================================
  * DASHBOARD
  * ===================================================================== */
 function renderDashboard() {
@@ -721,7 +799,7 @@ function startPractice(mode) {
 }
 
 function runPractice(mode, words) {
-  const steps = practiceSteps(words, POOL);
+  const steps = practiceSteps(words, learnedWords());
   const label = mode === "mistakes" ? "Mistake review" : "Word practice";
   let i = 0, correct = 0;
   const total = steps.length;
@@ -869,6 +947,7 @@ function render() {
 app.addEventListener("click", (e) => {
   const tab = e.target.closest("[data-route]"); if (tab) return go(tab.dataset.route);
   const part = e.target.closest("[data-part]"); if (part && !part.disabled) return startPart(part.dataset.part);
+  const utest = e.target.closest("[data-unittest]"); if (utest && !utest.disabled) return startUnitTest(utest.dataset.unittest);
   const practice = e.target.closest("[data-practice]"); if (practice && !practice.disabled) return startPractice(practice.dataset.practice);
   const say = e.target.closest("[data-say]"); if (say) return speak(say.dataset.say);
   const hearts = e.target.closest('[data-act="hearts"]'); if (hearts) return go("hearts");

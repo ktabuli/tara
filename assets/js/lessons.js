@@ -57,14 +57,18 @@ export function lessonParts(lesson) {
  * cross-lesson recap pool (so a new lesson opens by reviewing prior words). */
 export function allParts() {
   const out = [];
-  let learned = [];
+  let learned = [];          // ordered list of words seen before the current part
+  const known = [];          // unique vocab introduced up to & including each part
+  const seen = new Set();
   for (const l of allLessons()) {
     for (const p of lessonParts(l)) {
       const crossRecap = learned.slice(-8);
+      for (const w of p.words) if (!seen.has(w.tl)) { seen.add(w.tl); known.push(w); }
       out.push({
         ...p,
         unitId: l.unitId, unitTitle: l.unitTitle, unitColor: l.unitColor, unitIcon: l.unitIcon,
-        recapWords: p.recapWords.length ? p.recapWords : crossRecap
+        recapWords: p.recapWords.length ? p.recapWords : crossRecap,
+        known: known.slice()   // only words the learner has been introduced to by now
       });
       learned = learned.concat(p.words);
     }
@@ -97,17 +101,26 @@ function makeExercise(type, word, pool) {
   }
 }
 
-/* Fill-in-the-blank from an example sentence */
-function makeCloze(sentence, wordPool) {
+/* Fill-in-the-blank — blanks a word the learner has actually been taught,
+ * with distractors drawn only from known words. Returns null if the sentence
+ * contains no known single word to blank (so we never quiz untaught content). */
+function makeCloze(sentence, known) {
+  // single-word known vocab, with surface punctuation stripped (e.g. "Talaga?" -> "Talaga")
+  const singles = known.filter((w) => !/\s/.test(w.tl)).map((w) => w.tl.replace(/[?!.,]/g, ""));
+  if (singles.length < 2) return null;
+  const knownSet = new Set(singles.map(norm));
   const tokens = sentence.tl.split(" ");
-  const cand = tokens.map((t, i) => ({ t, i }))
-    .filter((o) => o.t.replace(/[?!.,]/g, "").length > 2 && !STOP.has(o.t.toLowerCase().replace(/[?!.,]/g, "")));
-  const pick = (cand.length ? cand : tokens.map((t, i) => ({ t, i })))[Math.floor(Math.random() * (cand.length || tokens.length))];
-  const answer = pick.t.replace(/[?!.,]/g, "");
+  const cand = tokens.map((t, i) => ({ c: t.replace(/[?!.,]/g, ""), i })).filter((o) => knownSet.has(norm(o.c)));
+  if (!cand.length) return null;
+  const pick = cand[Math.floor(Math.random() * cand.length)];
+  const answer = pick.c;
   const display = tokens.map((t, i) => (i === pick.i ? "_____" : t)).join(" ");
-  const distract = sample(wordPool.filter((w) => norm(w) !== norm(answer)), 3);
+  // match every option to the answer's leading case so the correct one isn't a visual giveaway
+  const setCase = (w) => (/^[A-Z]/.test(answer) ? w.charAt(0).toUpperCase() + w.slice(1) : w.charAt(0).toLowerCase() + w.slice(1));
+  const distract = sample(singles.filter((w) => norm(w) !== norm(answer)), 3).map(setCase);
+  if (!distract.length) return null;
   return { type: "cloze", prompt: "Fill in the blank", display, en: sentence.en,
-    answer, options: shuffle([answer, ...distract]) };
+    answer: setCase(answer), options: shuffle([setCase(answer), ...distract]) };
 }
 
 /* Tap-to-build a sentence (drag-and-drop equivalent) */
@@ -123,36 +136,28 @@ function makeBuild(sentence) {
 export function buildSteps(part, coursePool) {
   const steps = [];
   const words = part.words;
-
-  // word pool for cloze distractors: single content words from the course + sentences
-  const wordPool = [];
-  coursePool.forEach((v) => v.tl.split(" ").forEach((t) => {
-    const c = t.replace(/[?!.,]/g, "");
-    if (c.length > 2 && !STOP.has(c.toLowerCase())) wordPool.push(c);
-  }));
-  (part.sentences || []).forEach((s) => s.tl.split(" ").forEach((t) => {
-    const c = t.replace(/[?!.,]/g, "");
-    if (c.length > 2 && !STOP.has(c.toLowerCase())) wordPool.push(c);
-  }));
+  // Only ever quiz with words the learner has been introduced to.
+  const pool = part.known && part.known.length ? part.known : coursePool;
 
   // 1. culture/grammar tip (first part of a lesson)
   if (part.tip) steps.push({ type: "tip", tip: part.tip });
 
   // 2. recap a previously-learned word
   if (part.recapWords && part.recapWords.length) {
-    steps.push({ ...makeExercise("choose_en", sample(part.recapWords, 1)[0], coursePool), isRecap: true });
+    steps.push({ ...makeExercise("choose_en", sample(part.recapWords, 1)[0], pool), isRecap: true });
   }
 
   // 3. teach each new word, then a quick game on it
   words.forEach((w, j) => {
     steps.push({ type: "teach", word: w });
-    steps.push(makeExercise(j % 2 === 0 ? "choose_en" : "choose_tl", w, coursePool));
-    if (j === 0) steps.push(makeExercise("listen", w, coursePool));
+    steps.push(makeExercise(j % 2 === 0 ? "choose_en" : "choose_tl", w, pool));
+    if (j === 0) steps.push(makeExercise("listen", w, pool));
   });
 
-  // 4. fill in the blank
-  if (part.sentences && part.sentences.length) {
-    steps.push(makeCloze(sample(part.sentences, 1)[0], wordPool));
+  // 4. fill in the blank (skip any sentence with no known word to blank)
+  for (const sentence of shuffle(part.sentences || [])) {
+    const cz = makeCloze(sentence, pool);
+    if (cz) { steps.push(cz); break; }
   }
 
   // 5. build a sentence
@@ -163,7 +168,7 @@ export function buildSteps(part, coursePool) {
 
   // 6. speaking practice (for speaking-skill parts)
   if (part.skill === "speaking") {
-    steps.push(makeExercise("speak", sample(words, 1)[0], coursePool));
+    steps.push(makeExercise("speak", sample(words, 1)[0], pool));
   }
 
   // 7. match pairs
@@ -178,7 +183,7 @@ export function buildSteps(part, coursePool) {
 
   // 9. recap review of this part's words
   sample(words, Math.min(2, words.length)).forEach((w) =>
-    steps.push({ ...makeExercise("choose_tl", w, coursePool), isRecap: true }));
+    steps.push({ ...makeExercise("choose_tl", w, pool), isRecap: true }));
 
   // 10. quiz (last part of a lesson)
   if (part.quiz) steps.push({ type: "quiz", quiz: part.quiz });
@@ -195,6 +200,29 @@ export function practiceSteps(words, coursePool) {
   const steps = words.map((w, i) => makeExercise(types[i % types.length], w, coursePool));
   if (words.length >= 2) {
     steps.push({ type: "match", pairs: sample(words, Math.min(4, words.length)) });
+  }
+  return shuffle(steps);
+}
+
+/* =====================================================================
+ * Unit test (final assessment) — covers every lesson in the unit.
+ * No teaching steps; a mix of vocab questions, the lessons' quizzes,
+ * and one reading. `unit` is a COURSE unit (has .lessons).
+ * ===================================================================== */
+export function unitTestSteps(unit, coursePool) {
+  const seen = new Set();
+  const vocab = [];
+  unit.lessons.forEach((l) => l.vocab.forEach((w) => { if (!seen.has(w.tl)) { seen.add(w.tl); vocab.push(w); } }));
+
+  const types = ["choose_en", "choose_tl", "listen", "write"];
+  const steps = vocab.map((w, i) => makeExercise(types[i % types.length], w, coursePool));
+
+  unit.lessons.forEach((l) => { if (l.quiz) steps.push({ type: "quiz", quiz: l.quiz }); });
+
+  const withReading = unit.lessons.find((l) => l.reading);
+  if (withReading) {
+    const r = withReading.reading;
+    steps.push({ type: "reading", passage: r.passage, en: r.en, q: r.q, answer: r.answer, options: shuffle(r.options.slice()) });
   }
   return shuffle(steps);
 }
