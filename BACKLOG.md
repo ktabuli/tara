@@ -6,6 +6,73 @@ graduated ideas up into "Issues" when committed to.
 
 ---
 
+## 🧭 Economy redesign — approved spec (supersedes the skip-as-currency change)
+
+Reworks hearts / skips / gems into a per-node challenge model with a global
+gem economy. **This reverses the recent "replace gems with skips" change**:
+gems come back as the accumulating currency; skips become a per-node allowance.
+"Node" = one playable path node (a lesson **part**, the unit of a play session).
+
+### Skips (per-node safety valve)
+- **1 skip per node**, granted fresh at the start of every node. Does **not**
+  accumulate or carry between nodes; unused skips are lost. Retaking a node
+  grants a fresh skip.
+- "I don't know" button on a scored question: reveal the answer, **no heart
+  lost**, counts as **not-correct**, logs the word to Review. Disabled once the
+  node's single skip is used.
+- **Not available** in checkpoints or unit tests.
+
+### Hearts (per-node, ephemeral)
+- **3 hearts per node**, fresh every attempt. Each mistake −1. Hearts are
+  purely in-session — **no global pool, no passive 25-min regen** (remove that).
+- **3 mistakes → out-of-hearts popup**, mid-node:
+  - **[Use 10 gems → refill & continue]** — refill to 3 and **resume in place**
+    (live session continues; no saved snapshot needed). Disabled if <10 gems.
+  - **[End]** — node fails (incomplete), exit to Learn.
+- On **End/fail**: the node gets a **5-minute retry cooldown** (store a
+  `cooldownUntil` timestamp per node). Retaking restarts the node from scratch
+  with 3 fresh hearts.
+- Checkpoints & unit tests are **heart-free** (see below).
+
+### Cooldown (Learn page)
+- A node in cooldown shows **locked + "Retry in m:ss"** (live countdown).
+- Tapping it offers **[Pay 10 gems to skip the cooldown]** (unlocks now; still
+  retakes from scratch). Disabled if <10 gems.
+
+### Gems (accumulating currency)
+- **Base 15 gems** on a fresh start (one rescue affordable immediately).
+- Earned on **node completion**, scaled by stars (3★=5 / 2★=3 / 1★=1) — as
+  originally.
+- Spent **only** on the two 10-gem options above (resume-in-place /
+  skip-cooldown). Shown in the top stats bar + Rewards + Profile.
+
+### Unit tests (now REQUIRED, always pass-through)
+- Joins the unlock chain: you must **take** the unit's test to proceed, but
+  **any score clears the gate** (no 80% requirement to advance).
+- **Heart-free, no skips.** Pure %-scored.
+- Show a **visual ranking**: best % + a medal by tier (reuse star tiers:
+  ≥95% 🥇 / ≥80% 🥈 / ≥60% 🥉 / else show %). Encourages voluntary retakes for
+  100% without forcing it.
+- Keep `unit_master` / `graduate` achievements meaning **≥80%** (optional
+  excellence, no longer a gate).
+
+### Checkpoints (gated by score, heart-free)
+- **Heart-free, no skips** (unchanged in play).
+- **<30% → does not pass**; must retake to unlock what's beyond. ≥30% clears
+  the gate. (Applies to both halfway and cumulative checkpoints.)
+
+### UI/structure consequences
+- Top stats bar: **streak · gems · level** (remove the global hearts chip;
+  hearts now live only inside the node player). Remove the standalone Hearts
+  screen + `hearts` route.
+- `GATES` chain per unit becomes: first-half parts → halfway checkpoint →
+  second-half parts → **unit test (required)** → cumulative checkpoint (every
+  2nd unit) → next unit.
+- Store: drop global hearts/regen; add `gems`, `cooldowns` map; checkpoint
+  `done` requires ≥30%; keep `unitTests` best %. Update store tests.
+
+---
+
 ## 🐞 Issues to fix
 
 Severity: 🔴 breaks the core promise · 🟠 hurts the beginner on-ramp · 🟡 polish/trust.
