@@ -50,6 +50,9 @@ globalThis.document = {
   createElement: () => node(),
 };
 globalThis.window = { scrollTo: NOOP, addEventListener: NOOP };
+// Node < 21 has no global `navigator`; app.js reads `"serviceWorker" in navigator`
+// at load. Guard the assignment so it's a no-op where navigator already exists.
+if (typeof navigator === "undefined") globalThis.navigator = {};
 globalThis.fetch = () => Promise.resolve({ ok: false, json: () => Promise.resolve([]) });
 globalThis.setInterval = () => 0; globalThis.clearInterval = NOOP;
 globalThis.confirm = () => true;
