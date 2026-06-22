@@ -1,7 +1,7 @@
 /* =====================================================================
  * store.js — Persistent learner state (localStorage)
  * ---------------------------------------------------------------------
- * Tracks XP, gems, hearts, daily streak, per-lesson completion history,
+ * Tracks XP, gems, daily streak, per-lesson completion history,
  * and unlocked achievements. Everything is saved to the browser so the
  * learner's progress survives reloads and works fully offline.
  * ===================================================================== */
@@ -12,9 +12,7 @@ const DAILY_GOAL_XP = 30; // XP to count a day toward the streak
 const DEFAULT_STATE = {
   createdAt: null,
   xp: 0,
-  gems: 0,
-  hearts: 5,
-  heartsUpdatedAt: null,
+  gems: 15,               // accumulating currency — start with a base of 15
   streak: 0,
   bestStreak: 0,
   lastActiveDate: null,   // YYYY-MM-DD of last day goal was met
@@ -23,11 +21,15 @@ const DEFAULT_STATE = {
   lessons: {},            // { [lessonId]: { stars, attempts, lastScore, completedAt } }
   history: [],            // [{ lessonId, title, score, total, xp, at }]
   achievements: [],       // [achievementId]
+  mistakes: {},           // { [tl]: { tl, en, say, emoji, misses, at } } — words to review
+  unitTests: {},          // { [unitId]: { bestPct, passed, attempts, at } }
+  checkpoints: {},        // { [cpId]: { bestPct, attempts, done, at } } — cumulative reviews
+  cooldowns: {},          // { [nodeId]: epochMs } — node locked until this time after a fail
   settings: { sound: true, ttsRate: 0.85 }
 };
 
-const MAX_HEARTS = 5;
-const HEART_REFILL_MIN = 25; // minutes to regenerate one heart
+const COOLDOWN_MIN = 5;   // minutes a failed node is locked before retry
+const RESCUE_COST = 10;   // gems to refill hearts mid-node or skip a cooldown
 
 function todayStr(d = new Date()) {
   // Local date as YYYY-MM-DD
@@ -45,18 +47,17 @@ class Store {
     this.state = this._load();
     this._listeners = new Set();
     this._rollOver();
-    this._regenHearts();
     this.save();
   }
 
   _load() {
     try {
       const raw = localStorage.getItem(KEY);
-      if (!raw) return { ...structuredClone(DEFAULT_STATE), createdAt: Date.now(), heartsUpdatedAt: Date.now() };
+      if (!raw) return { ...structuredClone(DEFAULT_STATE), createdAt: Date.now() };
       const parsed = JSON.parse(raw);
       return { ...structuredClone(DEFAULT_STATE), ...parsed };
     } catch (e) {
-      return { ...structuredClone(DEFAULT_STATE), createdAt: Date.now(), heartsUpdatedAt: Date.now() };
+      return { ...structuredClone(DEFAULT_STATE), createdAt: Date.now() };
     }
   }
 
@@ -84,51 +85,25 @@ class Store {
     }
   }
 
-  /* --- passive heart regeneration --- */
-  _regenHearts() {
-    if (this.state.hearts >= MAX_HEARTS) {
-      this.state.heartsUpdatedAt = Date.now();
-      return;
-    }
-    const now = Date.now();
-    const last = this.state.heartsUpdatedAt || now;
-    const gained = Math.floor((now - last) / (HEART_REFILL_MIN * 60000));
-    if (gained > 0) {
-      this.state.hearts = Math.min(MAX_HEARTS, this.state.hearts + gained);
-      this.state.heartsUpdatedAt = this.state.hearts >= MAX_HEARTS ? now : last + gained * HEART_REFILL_MIN * 60000;
-    }
-  }
-
-  /* --- hearts --- */
-  loseHeart() {
-    this._regenHearts();
-    if (this.state.hearts > 0) this.state.hearts -= 1;
-    if (this.state.hearts === MAX_HEARTS - 1) this.state.heartsUpdatedAt = Date.now();
-    this.save();
-    return this.state.hearts;
-  }
-
-  refillHearts() {
-    this.state.hearts = MAX_HEARTS;
-    this.state.heartsUpdatedAt = Date.now();
-    this.save();
-  }
-
-  buyHeartsWithGems() {
-    if (this.state.gems >= 50 && this.state.hearts < MAX_HEARTS) {
-      this.state.gems -= 50;
-      this.refillHearts();
-      return true;
-    }
+  /* --- gems (accumulating currency) --- */
+  get gems() { return this.state.gems; }
+  spendGems(n = RESCUE_COST) {
+    if (this.state.gems >= n) { this.state.gems -= n; this.save(); return true; }
     return false;
   }
+  rescueCost() { return RESCUE_COST; }
 
-  get hearts() { this._regenHearts(); return this.state.hearts; }
-
-  msUntilNextHeart() {
-    if (this.state.hearts >= MAX_HEARTS) return 0;
-    const last = this.state.heartsUpdatedAt || Date.now();
-    return Math.max(0, last + HEART_REFILL_MIN * 60000 - Date.now());
+  /* --- per-node fail cooldown --- */
+  setCooldown(nodeId) {
+    this.state.cooldowns[nodeId] = Date.now() + COOLDOWN_MIN * 60000;
+    this.save();
+  }
+  cooldownRemaining(nodeId) {
+    const until = this.state.cooldowns[nodeId] || 0;
+    return Math.max(0, until - Date.now());
+  }
+  clearCooldown(nodeId) {
+    if (this.state.cooldowns[nodeId]) { delete this.state.cooldowns[nodeId]; this.save(); }
   }
 
   /* --- complete a lesson --- */
@@ -156,7 +131,9 @@ class Store {
     if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
     this.state.todayXp += xpGain;
 
-    if (this.state.todayXp >= DAILY_GOAL_XP && this.state.lastActiveDate !== t) {
+    // Streak: finishing ANY lesson counts the day toward your streak.
+    // (The daily XP goal is a separate motivator shown on the home screen.)
+    if (this.state.lastActiveDate !== t) {
       const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
       this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
       this.state.lastActiveDate = t;
@@ -170,6 +147,118 @@ class Store {
     this.save();
     return { xpGain, gemGain, stars, newAchievements };
   }
+
+  /* --- mistakes (words to review) --- */
+  recordMistake(w) {
+    if (!w || !w.tl) return;
+    const m = this.state.mistakes[w.tl] || { tl: w.tl, en: w.en, say: w.say, emoji: w.emoji, misses: 0 };
+    m.misses = (m.misses || 0) + 1;
+    m.at = Date.now();
+    this.state.mistakes[w.tl] = m;
+    this.save();
+  }
+  clearMistake(tl) {
+    if (this.state.mistakes[tl]) { delete this.state.mistakes[tl]; this.save(); }
+  }
+  mistakeList() { return Object.values(this.state.mistakes).sort((a, b) => b.at - a.at); }
+
+  /* --- practice session result (review hub) — does NOT complete a lesson --- */
+  practiceResult({ correct, total, title }) {
+    const score = total > 0 ? correct / total : 0;
+    const xpGain = 5 + Math.round(score * 10);
+    const gemGain = score >= 0.8 ? 2 : 1;
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "practice", title, score: correct, total, xp: xpGain, stars: 0, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { xpGain, gemGain, newAchievements };
+  }
+
+  /* --- unit test (final assessment per unit; 80% to pass) --- */
+  unitTestResult({ unitId, title, correct, total }) {
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const passed = pct >= 80;
+    const stars = pct >= 95 ? 3 : pct >= 80 ? 2 : pct >= 60 ? 1 : 0;
+    const xpGain = 20 + Math.round((pct / 100) * 30);
+    const gemGain = passed ? 10 : 3;
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const prev = this.state.unitTests[unitId];
+    const firstPass = passed && !(prev && prev.passed);
+    this.state.unitTests[unitId] = {
+      bestPct: Math.max(pct, prev?.bestPct || 0),
+      passed: passed || !!(prev && prev.passed),
+      attempts: (prev?.attempts || 0) + 1,
+      at: Date.now()
+    };
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "unittest:" + unitId, title, score: correct, total, xp: xpGain, stars, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { pct, passed, stars, xpGain, gemGain, firstPass, newAchievements };
+  }
+  unitTestPassed(unitId) { return !!(this.state.unitTests[unitId] && this.state.unitTests[unitId].passed); }
+  unitTestBest(unitId) { return this.state.unitTests[unitId]?.bestPct || 0; }
+  unitTestTaken(unitId) { return !!this.state.unitTests[unitId]; } // required gate clears once taken (any score)
+
+  /* --- checkpoint (cumulative mixed review every few lessons) --- */
+  checkpointResult({ id, title, correct, total }) {
+    const pct = total > 0 ? Math.round((correct / total) * 100) : 0;
+    const xpGain = 25 + Math.round((pct / 100) * 35);
+    const gemGain = 5 + (pct >= 80 ? 5 : 0);
+    this.state.xp += xpGain;
+    this.state.gems += gemGain;
+
+    const prev = this.state.checkpoints[id];
+    this.state.checkpoints[id] = {
+      bestPct: Math.max(pct, prev?.bestPct || 0),
+      // a checkpoint only "passes" (clears the gate) at >= 30%
+      attempts: (prev?.attempts || 0) + 1, done: (prev?.done || pct >= 30), at: Date.now()
+    };
+
+    const t = todayStr();
+    if (this.state.todayDate !== t) { this.state.todayDate = t; this.state.todayXp = 0; }
+    this.state.todayXp += xpGain;
+    if (this.state.lastActiveDate !== t) {
+      const gap = this.state.lastActiveDate ? daysBetween(this.state.lastActiveDate, t) : 99;
+      this.state.streak = gap === 1 ? this.state.streak + 1 : 1;
+      this.state.lastActiveDate = t;
+      this.state.bestStreak = Math.max(this.state.bestStreak, this.state.streak);
+    }
+    this.state.history.unshift({ lessonId: "checkpoint:" + id, title, score: correct, total, xp: xpGain, stars: 0, at: Date.now() });
+    if (this.state.history.length > 100) this.state.history.length = 100;
+
+    const newAchievements = this._checkAchievements();
+    this.save();
+    return { pct, xpGain, gemGain, newAchievements };
+  }
+  checkpointDone(id) { return !!(this.state.checkpoints[id] && this.state.checkpoints[id].done); }
+  checkpointBest(id) { return this.state.checkpoints[id]?.bestPct || 0; }
 
   /* --- progress helpers --- */
   isCompleted(lessonId) { return !!this.state.lessons[lessonId]; }
@@ -201,7 +290,7 @@ class Store {
   hasAchievement(id) { return this.state.achievements.includes(id); }
 
   reset() {
-    this.state = { ...structuredClone(DEFAULT_STATE), createdAt: Date.now(), heartsUpdatedAt: Date.now() };
+    this.state = { ...structuredClone(DEFAULT_STATE), createdAt: Date.now() };
     this.save();
   }
 }
@@ -214,8 +303,11 @@ export const ACHIEVEMENTS = [
   { id: "xp_500", icon: "🌟", title: "High Roller", desc: "Earn 500 XP", test: (s) => s.xp >= 500 },
   { id: "perfect", icon: "💯", title: "Flawless", desc: "Get 3 stars on a lesson", test: (s) => Object.values(s.lessons).some((l) => l.stars === 3) },
   { id: "ten_lessons", icon: "📚", title: "Bookworm", desc: "Complete 10 lessons", test: (s) => Object.keys(s.lessons).length >= 10 },
-  { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => Object.keys(s.lessons).some((id) => id.includes("l3") || id.includes("l4")) },
-  { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 }
+  { id: "speaker", icon: "🎤", title: "Speak Up", desc: "Finish a speaking lesson", test: (s) => ["u2l2", "u3l2", "u4l2", "u6l1"].some((id) => Object.keys(s.lessons).some((k) => k.startsWith(id))) },
+  { id: "gem_collector", icon: "💎", title: "Gem Collector", desc: "Save up 50 gems", test: (s) => s.gems >= 50 },
+  { id: "unit_master", icon: "🎓", title: "Unit Master", desc: "Pass your first unit test", test: (s) => Object.values(s.unitTests || {}).some((u) => u.passed) },
+  { id: "graduate", icon: "🏅", title: "Graduate", desc: "Pass all 6 unit tests", test: (s) => Object.values(s.unitTests || {}).filter((u) => u.passed).length >= 6 },
+  { id: "reviewer", icon: "🧠", title: "Memory Master", desc: "Finish a checkpoint review", test: (s) => Object.keys(s.checkpoints || {}).length >= 1 }
 ];
 
 export const store = new Store();

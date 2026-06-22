@@ -1,5 +1,5 @@
 /* Service worker — offline cache for Tara! Learn Tagalog (PWA) */
-const CACHE = "tara-tagalog-v1";
+const CACHE = "tara-tagalog-v24";
 const ASSETS = [
   "./",
   "./index.html",
@@ -9,7 +9,9 @@ const ASSETS = [
   "./assets/js/curriculum.js",
   "./assets/js/store.js",
   "./assets/js/lessons.js",
-  "./assets/img/icon.svg"
+  "./assets/js/icons.js",
+  "./assets/img/icon.svg",
+  "./assets/audio/manifest.json"
 ];
 
 self.addEventListener("install", (e) => {
@@ -26,20 +28,33 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   const req = e.request;
   if (req.method !== "GET") return;
-  // Cache-first for our own assets; network fallback for everything else (e.g. fonts).
-  e.respondWith(
-    caches.match(req).then((hit) => {
-      if (hit) return hit;
-      return fetch(req)
+  const sameOrigin = new URL(req.url).origin === self.location.origin;
+
+  if (sameOrigin) {
+    // Network-first for our own files so code/content updates appear right away.
+    // Falls back to the cache when offline.
+    e.respondWith(
+      fetch(req)
         .then((res) => {
-          // opportunistically cache same-origin GETs
-          if (res && res.status === 200 && new URL(req.url).origin === self.location.origin) {
+          if (res && res.status === 200) {
             const clone = res.clone();
             caches.open(CACHE).then((c) => c.put(req, clone));
           }
           return res;
         })
-        .catch(() => caches.match("./index.html"));
-    })
+        .catch(() => caches.match(req).then((hit) => hit || caches.match("./index.html")))
+    );
+    return;
+  }
+
+  // Cross-origin (e.g. Google Fonts): cache-first, then network.
+  e.respondWith(
+    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+      if (res && res.status === 200) {
+        const clone = res.clone();
+        caches.open(CACHE).then((c) => c.put(req, clone));
+      }
+      return res;
+    }).catch(() => hit))
   );
 });

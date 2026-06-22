@@ -12,11 +12,11 @@ Built around the project's overview notes:
 
 | # | Goal | How it's delivered |
 |---|------|--------------------|
-| 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, a learning path with unlockable lessons, stars per lesson, and celebratory finish screens |
-| 2 | **Reading, writing, speech / conversation** | Five exercise types: multiple-choice (reading), type-the-translation (writing), listen-and-choose & speak-aloud (speech via the Web Speech API), and match-the-pairs |
+| 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, an unlockable learning path, stars per lesson, **required checkpoints** (a halfway review inside each unit + a cumulative review after every 2 units), a **Unit Test** per unit (80% to pass), and celebratory finish screens |
+| 2 | **Reading, writing, speech / conversation** | Interleaved flashcards + games: multiple-choice, type-the-translation, fill-in-the-blank (cloze), tap-to-build a sentence, match-the-pairs, reading-comprehension dialogues, listen-and-choose & speak-aloud (Web Speech API), plus a quiz per lesson. Lessons are split into bite-sized parts that open with a recap |
 | 3 | **Progress tracker / dashboard** | A **Stats** screen with KPIs, a 7-day activity chart, per-unit completion bars, and a skills breakdown |
 | 4 | **Mobile use** | Mobile-first responsive design, installable to the home screen, works offline, big touch targets, bottom tab bar |
-| 5 | **Review history / check off lessons** | A **History** screen listing every lesson with completion check-marks, stars and dates, plus a recent-activity log; replay any lesson anytime |
+| 5 | **Review hub** | A **Review** screen to review words you've learned (tap to hear), revisit past mistakes, see your skills, and run quick mixed **practice** sessions — without repeating completed lessons |
 | 6 | **Daily streak** | Daily XP goal that drives a streak counter (with best-streak tracking and a graceful break if a day is missed) |
 | 7 | **Reward system** | 9 unlockable achievement badges and a gem shop (spend gems to refill hearts) |
 
@@ -63,11 +63,27 @@ python3 -m http.server 8000
 
 > 💡 Speech recognition (the microphone exercises) works best in Chrome/Edge and requires a secure context (`https://` or `localhost`).
 
+## Tests
+
+Unit tests cover the pure logic (curriculum integrity, the lesson/part &
+exercise engine, and the progress store). They use Node's built-in test
+runner — **no dependencies, no build**:
+
+```bash
+node --test        # or: npm test
+```
+
+They also run automatically in CI on every push (`.github/workflows/test.yml`).
+
 ## Curriculum at a glance
 
-1. **Greetings** — hello, goodbye, times of day, polite words
-2. **Getting Acquainted** — introductions, "nice to meet you", first conversation
-3. **Numbers** — 1–10
-4. **Family** — parents, siblings, the whole family
-5. **Food & Drink** — meals, snacks, ordering
-6. **Out & About** — useful questions, getting help, heartfelt phrases
+Based on a 6-unit instructional learning plan. Each lesson teaches its words
+(flashcards first), shows a short **culture/grammar tip**, runs a mix of
+reading/writing/listening/speaking games, and ends with a **quiz question**.
+
+1. **Courtesy & Sentences** — greetings; po/opo respect; V-S-O word order
+2. **Social Interactions** — introductions; the "ba" question particle; pronunciation & stress
+3. **Streets & Transport** — directions (kanan/kaliwa); jeepney phrases (Para po!, Bayad po)
+4. **Dining & Flavors** — hunger/thirst; the "ma-" prefix; the rin/din rule
+5. **Numbers, Time & Shopping** — counting; haggling (tawad); the "alas" time system
+6. **Connection & Tradition** — affection (Mahal kita); Taglish; bayanihan & holidays
