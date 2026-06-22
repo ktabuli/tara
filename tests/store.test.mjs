@@ -6,41 +6,34 @@ import { store, ACHIEVEMENTS } from "../assets/js/store.js";
 beforeEach(() => store.reset());
 
 test("fresh state defaults", () => {
-  assert.equal(store.hearts, 5);
   assert.equal(store.state.xp, 0);
   assert.equal(store.state.streak, 0);
-  assert.equal(store.skips, 3); // start with 3 skips
+  assert.equal(store.gems, 15); // base 15 gems to start
   assert.equal(store.completedCount(), 0);
   assert.equal(store.mistakeList().length, 0);
 });
 
-test("hearts: lose decrements", () => {
-  assert.equal(store.loseHeart(), 4);
-  assert.equal(store.loseHeart(), 3);
+test("gems: spend when affordable, floor otherwise", () => {
+  assert.equal(store.gems, 15);
+  assert.equal(store.spendGems(10), true);
+  assert.equal(store.gems, 5);
+  assert.equal(store.spendGems(10), false); // not enough
+  assert.equal(store.gems, 5);
 });
 
-test("skips: start at 3, useSkip decrements and floors at 0", () => {
-  assert.equal(store.skips, 3);
-  assert.equal(store.useSkip(), true);
-  assert.equal(store.skips, 2);
-  store.state.skips = 1;
-  assert.equal(store.useSkip(), true);
-  assert.equal(store.skips, 0);
-  assert.equal(store.useSkip(), false); // none left
-  assert.equal(store.skips, 0);
-});
-
-test("hearts regenerate over time", () => {
-  store.state.hearts = 2;
-  store.state.heartsUpdatedAt = Date.now() - 60 * 60000; // 60 min ago, refill = 25 min
-  assert.equal(store.hearts, 4); // +2 regenerated, capped sensibly
+test("cooldown: set, report remaining, clear", () => {
+  assert.equal(store.cooldownRemaining("u1l1p1"), 0);
+  store.setCooldown("u1l1p1");
+  assert.ok(store.cooldownRemaining("u1l1p1") > 0);
+  store.clearCooldown("u1l1p1");
+  assert.equal(store.cooldownRemaining("u1l1p1"), 0);
 });
 
 test("completeLesson: perfect score", () => {
   const r = store.completeLesson({ lessonId: "u1l1p1", title: "Greetings · 1", correct: 7, total: 7 });
   assert.equal(r.stars, 3);
   assert.equal(r.xpGain, 20);       // 10 base + 10 bonus
-  assert.equal(r.skipGain, 5);
+  assert.equal(r.gemGain, 5);
   assert.equal(store.state.xp, 20);
   assert.ok(store.isCompleted("u1l1p1"));
   assert.equal(store.completedCount(), 1);
@@ -119,6 +112,21 @@ test("checkpointResult records a review without completing lessons", () => {
   assert.ok(r.newAchievements.map((a) => a.id).includes("reviewer"));
 });
 
+test("checkpoint passes the gate only at >= 30%", () => {
+  store.checkpointResult({ id: "cp2", title: "x", correct: 2, total: 10 }); // 20%
+  assert.equal(store.checkpointDone("cp2"), false);
+  store.checkpointResult({ id: "cp2", title: "x", correct: 4, total: 10 }); // 40% retry
+  assert.equal(store.checkpointDone("cp2"), true);  // now cleared
+  assert.equal(store.checkpointBest("cp2"), 40);
+});
+
+test("unit test gate clears once taken, at any score", () => {
+  assert.equal(store.unitTestTaken("u2"), false);
+  store.unitTestResult({ unitId: "u2", title: "x", correct: 1, total: 10 }); // 10%
+  assert.equal(store.unitTestTaken("u2"), true);    // required gate cleared
+  assert.equal(store.unitTestPassed("u2"), false);  // but not "passed" (<80%)
+});
+
 test("levels: 100 XP per level", () => {
   assert.equal(store.level(), 1);
   store.state.xp = 250;
@@ -145,10 +153,12 @@ test("ACHIEVEMENTS are well-formed", () => {
 test("reset clears all progress", () => {
   store.completeLesson({ lessonId: "u1l1p1", title: "x", correct: 7, total: 7 });
   store.recordMistake({ tl: "Oo", en: "Yes", say: "O-o" });
-  store.loseHeart();
+  store.spendGems(5);
+  store.setCooldown("u1l1p1");
   store.reset();
   assert.equal(store.state.xp, 0);
   assert.equal(store.completedCount(), 0);
   assert.equal(store.mistakeList().length, 0);
-  assert.equal(store.hearts, 5);
+  assert.equal(store.gems, 15);
+  assert.equal(store.cooldownRemaining("u1l1p1"), 0);
 });

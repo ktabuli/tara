@@ -125,6 +125,8 @@ b { font-weight: 800; }
 .node.ready .node-circle { animation: bob 2.4s ease-in-out infinite; }
 .node.done .node-circle { background: var(--gold); color: #2A2C24; box-shadow: 0 6px 0 var(--gold-d), var(--shadow); }
 .node.locked .node-circle { background: #E2E3DE; color: #A2A79B; box-shadow: 0 6px 0 #C9CBC2; }
+.node.cooldown .node-circle { background: #FBE6C9; color: var(--gold-d); box-shadow: 0 6px 0 #ECC98E; }
+.node.cooldown .node-title { color: var(--gold-d); }
 .node-stars { font-size: .8rem; color: var(--gold-d); height: 1em; letter-spacing: 1px; }
 .node-title { font-size: .78rem; font-weight: 800; color: var(--ink); line-height: 1.1; }
 .node.locked .node-title { color: var(--muted); }
@@ -158,7 +160,9 @@ b { font-weight: 800; }
 .lesson-shell { display: flex; flex-direction: column; min-height: 100vh; padding: 14px 16px calc(env(safe-area-inset-bottom) + 16px); }
 .lesson-top { display: flex; align-items: center; gap: 12px; }
 .lesson-bar { flex: 1; }
-.hearts-mini { font-weight: 900; color: var(--red); font-size: .95rem; }
+.hearts-mini { display: flex; gap: 3px; align-items: center; }
+.hearts-mini .hm.full { color: var(--red); }
+.hearts-mini .hm.empty { color: #DAD8D1; }
 .hearts-mini.lost { animation: heartlost .5s; }
 @keyframes heartlost {
   0% { transform: scale(1.5); color: #E24A50; }
@@ -440,6 +444,20 @@ b { font-weight: 800; }
 .ut-ico { display: inline-flex; color: var(--gold-d); }
 .unit-test.passed .ut-ico { color: var(--teal); }
 .unit-test.locked .ut-ico { color: var(--muted); }
+.ut-medal { font-size: 1.5rem; line-height: 1; }
+
+/* overlay modal (out-of-hearts / cooldown prompts) */
+.modal-ov { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  padding: 24px; background: rgba(42, 44, 36, .5); animation: fadein .15s ease; }
+.modal-card { background: var(--card); border-radius: var(--radius); padding: 24px; max-width: 360px; width: 100%;
+  text-align: center; box-shadow: var(--shadow-lg); animation: pop .18s ease; }
+.modal-emoji { font-size: 2.8rem; }
+.modal-title { font-weight: 900; font-size: 1.25rem; margin-top: 6px; }
+.modal-msg { color: var(--muted); margin-top: 6px; }
+.modal-note { color: var(--gold-d); font-weight: 700; font-size: .85rem; margin-top: 8px; }
+.modal-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .ut-main { display: flex; flex-direction: column; }
 .ut-title { font-weight: 900; font-size: 1rem; }
 .ut-sub { font-size: .78rem; color: var(--muted); margin-top: 1px; }

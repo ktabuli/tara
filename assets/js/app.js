@@ -17,6 +17,7 @@ const app = document.getElementById("app");
 const POOL = allLessons().flatMap((l) => l.vocab);   // distractor pool
 const PARTS = allParts();
 const state = { route: "home" };
+let homeTimer = null; // live countdown ticker for node cooldowns on the Learn page
 
 /* slugs of words that have a recorded audio file (assets/audio/manifest.json) */
 let RECORDED = new Set();
@@ -30,13 +31,21 @@ function loadRecorded() {
 /* ---------- helpers ---------- */
 function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstElementChild; }
 function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
-function go(route) { state.route = route; render(); window.scrollTo({ top: 0 }); }
+function go(route) { if (homeTimer) { clearInterval(homeTimer); homeTimer = null; } state.route = route; render(); window.scrollTo({ top: 0 }); }
 
 /* readable foreground (charcoal or white) for a given background colour */
 function fg(hex) {
   const c = hex.replace("#", "");
   const r = parseInt(c.slice(0, 2), 16), g = parseInt(c.slice(2, 4), 16), b = parseInt(c.slice(4, 6), 16);
   return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.62 ? "#2A2C24" : "#FEFDFF";
+}
+
+/* unit-test ranking medal by best score */
+function medalFor(pct) { return pct >= 95 ? "🥇" : pct >= 80 ? "🥈" : pct >= 60 ? "🥉" : ""; }
+/* m:ss countdown from milliseconds */
+function fmtCountdown(ms) {
+  const s = Math.ceil(ms / 1000);
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 /* track which vocab words were missed (for the Review hub) */
@@ -74,8 +83,9 @@ const UNIT_ICON = { u1: "chat", u2: "group", u3: "bus", u4: "dining", u5: "cart"
 
 /* part index helpers (for unlock + progress) */
 /* Ordered chain of everything that must be done in sequence: lesson parts,
- * a required halfway checkpoint inside each unit, and a required cumulative
- * checkpoint after every 2nd unit. Each item unlocks when the previous is done. */
+ * a required halfway checkpoint inside each unit, a required unit test at the
+ * unit's end, and a required cumulative checkpoint after every 2nd unit. Each
+ * item unlocks when the previous is done. */
 const GATES = (() => {
   const g = [];
   COURSE.units.forEach((u, ui) => {
@@ -84,11 +94,16 @@ const GATES = (() => {
     up.slice(0, half).forEach((p) => g.push({ kind: "part", id: p.id }));
     g.push({ kind: "halfway", id: "hw" + u.id, unitIndex: ui });
     up.slice(half).forEach((p) => g.push({ kind: "part", id: p.id }));
+    g.push({ kind: "unittest", id: "ut" + u.id, unitId: u.id });
     if ((ui + 1) % 2 === 0) g.push({ kind: "cumulative", id: "cp" + ui, unitIndex: ui });
   });
   return g;
 })();
-function gateDone(gt) { return gt.kind === "part" ? store.isCompleted(gt.id) : store.checkpointDone(gt.id); }
+function gateDone(gt) {
+  if (gt.kind === "part") return store.isCompleted(gt.id);
+  if (gt.kind === "unittest") return store.unitTestTaken(gt.unitId); // any score clears it
+  return store.checkpointDone(gt.id); // halfway / cumulative — needs >= 30%
+}
 function isUnlocked(id) {
   const i = GATES.findIndex((g) => g.id === id);
   return i === 0 || (i > 0 && gateDone(GATES[i - 1]));
@@ -102,8 +117,7 @@ function statsBar() {
   return `
     <header class="topbar">
       <div class="stat s-streak" title="Day streak"><span class="stat-ico">${icon("streak", { size: 20 })}</span><span class="stat-val">${s.streak}</span></div>
-      <div class="stat s-skips" title="Skips — pass a question you don't know"><span class="stat-ico">${icon("skip", { size: 20 })}</span><span class="stat-val">${store.skips}</span></div>
-      <div class="stat hearts" data-act="hearts" title="Hearts"><span class="stat-ico">${icon("hearts", { size: 20 })}</span><span class="stat-val">${store.hearts}</span></div>
+      <div class="stat s-gems" title="Gems"><span class="stat-ico">${icon("gems", { size: 20 })}</span><span class="stat-val">${store.gems}</span></div>
       <div class="stat level-pill" title="Level ${store.level()}"><span class="stat-ico">${icon("level", { size: 20 })}</span><span class="stat-val">Lv ${store.level()}</span></div>
     </header>`;
 }
@@ -146,27 +160,41 @@ function renderHome() {
       const done = store.isCompleted(p.id);
       const stars = store.lessonStars(p.id);
       const unlocked = isUnlocked(p.id);
+      const cdMs = store.cooldownRemaining(p.id);
+      const cooling = unlocked && !done && cdMs > 0; // failed recently — locked behind a timer
       const label = p.partCount > 1 ? `${p.title} · ${p.part}` : p.title;
+      const cls = cooling ? "cooldown" : done ? "done" : unlocked ? "ready" : "locked";
+      const circle = cooling ? icon("history", { size: 30 })
+        : done ? icon("check", { size: 34 })
+        : unlocked ? (SKILL_ICON[p.skill] || icon("reading"))
+        : icon("lock", { size: 28 });
       return `
-        <button class="node ${done ? "done" : unlocked ? "ready" : "locked"} pos-${offset}"
-                data-part="${p.id}" ${unlocked ? "" : "disabled"} style="--unit-color:${unit.color}">
-          <span class="node-circle" style="${unlocked && !done ? `color:${fg(unit.color)}` : ""}">${done ? icon("check", { size: 34 }) : unlocked ? (SKILL_ICON[p.skill] || icon("reading")) : icon("lock", { size: 28 })}</span>
+        <button class="node ${cls} pos-${offset}"
+                data-part="${p.id}" ${unlocked ? "" : "disabled"}
+                ${cooling ? `data-cooldown-until="${Date.now() + cdMs}"` : ""}
+                style="--unit-color:${unit.color}">
+          <span class="node-circle" style="${unlocked && !done && !cooling ? `color:${fg(unit.color)}` : ""}">${circle}</span>
           <span class="node-stars">${"★".repeat(stars)}${"☆".repeat(done ? 3 - stars : 0)}</span>
-          <span class="node-title">${esc(label)}</span>
+          <span class="node-title">${cooling ? `Retry in ${fmtCountdown(cdMs)}` : esc(label)}</span>
         </button>`;
     }).join("");
 
-    // Unit test — final assessment, unlocks once every part in the unit is done
-    const allDone = parts.every((p) => store.isCompleted(p.id));
-    const passed = store.unitTestPassed(unit.id);
+    // Unit test — REQUIRED to advance, but any score clears the gate. Shows a
+    // best-score ranking medal to motivate (optional) retakes for 100%.
+    const utUnlocked = isUnlocked("ut" + unit.id);
+    const taken = store.unitTestTaken(unit.id);
     const best = store.unitTestBest(unit.id);
-    const utCls = !allDone ? "locked" : passed ? "passed" : "ready";
-    const utSub = !allDone ? "Finish the lessons to unlock"
-      : passed ? `Passed${best ? ` · best ${best}%` : ""} — tap to retake`
-      : "Test everything in this unit";
+    const medal = taken ? medalFor(best) : "";
+    const utCls = !utUnlocked ? "locked" : taken ? "passed" : "ready";
+    const utSub = !utUnlocked ? "Finish the lessons to unlock"
+      : taken ? `Best ${best}%${medal ? ` ${medal}` : ""} — tap to retake`
+      : "Required · test everything in this unit";
+    const utIco = !utUnlocked ? icon("lock", { size: 22 })
+      : taken ? (medal ? `<span class="ut-medal">${medal}</span>` : icon("check", { size: 24 }))
+      : icon("rewards", { size: 24 });
     const utHtml = `
-      <button class="unit-test ${utCls}" data-unittest="${unit.id}" ${allDone ? "" : "disabled"}>
-        <span class="ut-ico">${!allDone ? icon("lock", { size: 22 }) : passed ? icon("check", { size: 24 }) : icon("rewards", { size: 24 })}</span>
+      <button class="unit-test ${utCls}" data-unittest="${unit.id}" ${utUnlocked ? "" : "disabled"}>
+        <span class="ut-ico">${utIco}</span>
         <span class="ut-main"><span class="ut-title">Unit Test</span><span class="ut-sub">${utSub}</span></span>
       </button>`;
 
@@ -203,30 +231,60 @@ function renderHome() {
       <div class="footer-note">Made with ❤️ for Tagalog learners</div>
     </main>
     ${tabBar("home")}`;
+
+  scheduleHomeCooldownTick();
+}
+
+/* Tick down any node-cooldown timers shown on the Learn page; re-render the
+ * page once a cooldown expires so the node returns to its normal state. */
+function scheduleHomeCooldownTick() {
+  if (homeTimer) { clearInterval(homeTimer); homeTimer = null; }
+  if (!app.querySelector("[data-cooldown-until]")) return;
+  homeTimer = setInterval(() => {
+    if (state.route !== "home") { clearInterval(homeTimer); homeTimer = null; return; }
+    let expired = false;
+    app.querySelectorAll("[data-cooldown-until]").forEach((node) => {
+      const ms = Number(node.dataset.cooldownUntil) - Date.now();
+      if (ms <= 0) { expired = true; return; }
+      const t = node.querySelector(".node-title");
+      if (t) t.textContent = `Retry in ${fmtCountdown(ms)}`;
+    });
+    if (expired) renderHome();
+  }, 1000);
 }
 
 /* =====================================================================
  * LESSON PLAYER — interleaved steps (teaching + games)
  * ===================================================================== */
+const NODE_HEARTS = 3; // hearts per node (fresh every attempt)
+
 function startPart(partId) {
-  if (store.hearts <= 0) { go("hearts"); return; }
+  const cd = store.cooldownRemaining(partId);
+  if (cd > 0) return cooldownPrompt(partById(partId), cd); // failed recently — offer to wait or pay
   const part = partById(partId);
   if (!part) return go("home");
   runPart(part, buildSteps(part, POOL));
 }
 
+/* small ❤ row for the lesson header: filled then empty up to NODE_HEARTS */
+function heartsMiniHtml(hearts) {
+  let out = "";
+  for (let k = 0; k < NODE_HEARTS; k++) out += `<span class="hm ${k < hearts ? "full" : "empty"}">${icon("hearts", { size: 18 })}</span>`;
+  return out;
+}
+
 function runPart(part, steps) {
-  let i = 0, correct = 0;
+  let i = 0, correct = 0, hearts = NODE_HEARTS, skipUsed = false;
   const scored = steps.filter((s) => s.type !== "teach" && s.type !== "tip").length;
 
-  function shell(inner) {
+  function shell() {
     const pct = Math.round((i / steps.length) * 100);
     app.innerHTML = `
       <div class="lesson-shell">
         <div class="lesson-top">
           <button class="icon-btn" data-act="quit">✕</button>
           <div class="bar lesson-bar"><div class="bar-fill" style="width:${pct}%"></div></div>
-          <div class="hearts-mini">${icon("hearts", { size: 20 })} ${store.hearts}</div>
+          <div class="hearts-mini" id="heartsMini">${heartsMiniHtml(hearts)}</div>
         </div>
         <div class="lesson-body" id="exbody"></div>
         <div class="lesson-skip" id="exskip"></div>
@@ -237,15 +295,33 @@ function runPart(part, steps) {
   }
 
   function loseLife() {
-    store.loseHeart();
-    const hm = app.querySelector(".hearts-mini");
-    if (hm) { hm.innerHTML = `${icon("hearts", { size: 20 })} ${store.hearts}`; hm.classList.remove("lost"); void hm.offsetWidth; hm.classList.add("lost"); }
+    if (hearts > 0) hearts--;
+    const hm = app.querySelector("#heartsMini");
+    if (hm) { hm.innerHTML = heartsMiniHtml(hearts); hm.classList.remove("lost"); void hm.offsetWidth; hm.classList.add("lost"); }
   }
 
   function next(wasCorrect) {
     if (wasCorrect) correct++;
-    if (store.hearts <= 0) return outOfHearts(part);
+    if (hearts <= 0) return outOfHeartsPopup();
     i++; paint();
+  }
+
+  // 3 mistakes → out of hearts: pay to refill & resume in place, or end (fail + cooldown)
+  function outOfHeartsPopup() {
+    const cost = store.rescueCost();
+    const canPay = store.gems >= cost;
+    const ov = modal({
+      emoji: "💔",
+      title: "Out of hearts",
+      msg: `You've used all ${NODE_HEARTS} hearts for this lesson.`,
+      note: canPay ? "" : `You need ${cost} gems to continue. Earn gems by finishing lessons.`,
+      buttons: [
+        { label: `${icon("gems", { size: 18 })} Use ${cost} gems — refill & continue`, cls: "btn-primary", disabled: !canPay,
+          onClick: () => { if (store.spendGems(cost)) { ov.remove(); hearts = NODE_HEARTS; i++; paint(); } } },
+        { label: "End lesson", cls: "btn-ghost",
+          onClick: () => { ov.remove(); store.setCooldown(part.id); go("home"); } }
+      ]
+    });
   }
 
   function paint() {
@@ -255,7 +331,8 @@ function runPart(part, steps) {
     if (step.type === "tip") return renderTip(step.tip, body, foot, () => { i++; paint(); });
     if (step.type === "teach") return renderTeach(step.word, body, foot, () => { i++; paint(); });
     renderExercise(step, body, foot, next, loseLife);
-    if (step.type !== "match") renderSkip(skip, step, body, foot, next); // match can't be failed → no skip
+    // one skip per node; match can't be failed so it's never skippable
+    if (!skipUsed && step.type !== "match") renderSkip(skip, step, body, foot, () => { skipUsed = true; next(false); });
   }
   paint();
 }
@@ -313,19 +390,16 @@ function feedbackBar(foot, ok, answerText, onNext, extra, skipped = false) {
   fb.querySelector('[data-act="next"]').onclick = onNext;
 }
 
-/* "I don't know" control shown under a scored exercise during a lesson.
- * Spends a skip, reveals the answer (no heart lost), and moves on. */
-function renderSkip(slot, ex, body, foot, done) {
+/* "I don't know" control — one skip per node. Reveals the answer (no heart
+ * lost), logs the word for Review, and moves on. Only rendered while the
+ * node's single skip is still available. */
+function renderSkip(slot, ex, body, foot, onSkip) {
   if (!slot) return;
-  const n = store.skips;
-  slot.innerHTML = `<button class="skip-btn" data-act="skip" ${n > 0 ? "" : "disabled"}>
-    ${icon("skip", { size: 16 })} I don't know ${n > 0 ? `· ${n} skip${n === 1 ? "" : "s"} left` : "· no skips left"}</button>`;
-  if (n <= 0) return;
+  slot.innerHTML = `<button class="skip-btn" data-act="skip">${icon("skip", { size: 16 })} I don't know</button>`;
   const answer = ex.type === "quiz" ? ex.quiz.answer : ex.answer;
   const extra = ex.type === "quiz" ? ex.quiz.explain : null;
   const isCorrect = (val) => checkAnswer(ex.type === "quiz" ? { type: "choose", answer } : ex, val);
   slot.querySelector('[data-act="skip"]').onclick = () => {
-    if (!store.useSkip()) return;
     if (ex.word) store.recordMistake(ex.word); // resurface it in Review
     body.querySelectorAll(".option, .tile, .match-item, .mic-btn").forEach((x) => (x.disabled = true));
     body.querySelectorAll(".text-input").forEach((x) => { x.disabled = true; });
@@ -333,8 +407,48 @@ function renderSkip(slot, ex, body, foot, done) {
     const ce = body.querySelector("#clozeEn"); if (ce) ce.classList.remove("hidden");
     const re = body.querySelector("#readingEn"); if (re) re.classList.remove("hidden");
     if (answer) speak(answer);
-    feedbackBar(foot, false, answer, () => done(false), extra, true);
+    feedbackBar(foot, false, answer, onSkip, extra, true);
   };
+}
+
+/* ---------- overlay modal (out-of-hearts, cooldown prompts) ---------- */
+function modal({ emoji, title, msg, note, buttons }) {
+  const ov = el(`
+    <div class="modal-ov">
+      <div class="modal-card">
+        ${emoji ? `<div class="modal-emoji">${emoji}</div>` : ""}
+        <div class="modal-title">${esc(title)}</div>
+        ${msg ? `<div class="modal-msg">${esc(msg)}</div>` : ""}
+        ${note ? `<div class="modal-note">${esc(note)}</div>` : ""}
+        <div class="modal-actions"></div>
+      </div>
+    </div>`);
+  const acts = ov.querySelector(".modal-actions");
+  buttons.forEach((b) => {
+    const btn = el(`<button class="btn ${b.cls || "btn-primary"}" ${b.disabled ? "disabled" : ""}>${b.label}</button>`);
+    if (!b.disabled && b.onClick) btn.onclick = b.onClick;
+    acts.appendChild(btn);
+  });
+  app.appendChild(ov);
+  return ov;
+}
+
+/* Tapping a node that's still in its retry cooldown: wait, or pay to skip it. */
+function cooldownPrompt(part, cdMs) {
+  if (!part) return;
+  const cost = store.rescueCost();
+  const canPay = store.gems >= cost;
+  const ov = modal({
+    emoji: "⏳",
+    title: "Locked — retry cooldown",
+    msg: `You can retake this lesson in ${fmtCountdown(cdMs)}.`,
+    note: canPay ? "" : `Or earn ${cost} gems to skip the wait.`,
+    buttons: [
+      { label: `${icon("gems", { size: 18 })} Pay ${cost} gems — skip the wait`, cls: "btn-primary", disabled: !canPay,
+        onClick: () => { if (store.spendGems(cost)) { store.clearCooldown(part.id); ov.remove(); startPart(part.id); } } },
+      { label: "Wait", cls: "btn-ghost", onClick: () => { ov.remove(); } }
+    ]
+  });
 }
 
 /* footnote glossing the helper words in a sentence exercise */
@@ -607,21 +721,7 @@ function renderExercise(ex, body, foot, done, loseLife = () => {}) {
   }
 }
 
-/* ---------- out of hearts / finish ---------- */
-function outOfHearts(part) {
-  app.innerHTML = `
-    <div class="center-screen">
-      <div class="big-emoji">💔</div><h2>Out of hearts</h2>
-      <p>Hearts recharge over time — come back soon. In the meantime you can keep practising in Review (no hearts needed). Tip: tap <b>I don't know</b> to spend a skip instead of guessing.</p>
-      <div class="stack">
-        <button class="btn btn-primary" data-act="review">Practise in Review</button>
-        <button class="btn btn-ghost" data-act="home">Back to lessons</button>
-      </div>
-    </div>`;
-  app.querySelector('[data-act="review"]').onclick = () => go("history");
-  app.querySelector('[data-act="home"]').onclick = () => go("home");
-}
-
+/* ---------- finish ---------- */
 function finishPart(part, correct, total) {
   const title = part.partCount > 1 ? `${part.title} · ${part.part}` : part.title;
   const r = store.completeLesson({ lessonId: part.id, title, correct, total });
@@ -637,7 +737,7 @@ function finishPart(part, correct, total) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
       ${achHtml}
       <div class="stack">
@@ -650,7 +750,8 @@ function finishPart(part, correct, total) {
 }
 
 /* =====================================================================
- * UNIT TEST — final assessment for a whole unit (no hearts; 80% to pass)
+ * UNIT TEST — required, heart-free, no skips. Any score clears the gate; the
+ * score is shown as a ranking to motivate voluntary retakes for 100%.
  * ===================================================================== */
 function startUnitTest(unitId) {
   const unit = unitById(unitId);
@@ -686,25 +787,31 @@ function runUnitTest(unit, steps) {
 
 function finishUnitTest(unit, correct, total) {
   const r = store.unitTestResult({ unitId: unit.id, title: `${unit.title} — Unit Test`, correct, total });
+  const best = store.unitTestBest(unit.id);
+  const medal = medalFor(best);
   const achHtml = r.newAchievements.length
     ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
        ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
+  // Always pass-through (required gate already cleared). Show a ranking to
+  // motivate voluntary retakes for 100%.
+  const rankLine = r.pct >= 100 ? "Perfect score! 🥇 You aced the unit."
+    : `Best so far: ${best}%${medal ? ` ${medal}` : ""} — retake any time to reach 100%.`;
   app.innerHTML = `
     <div class="center-screen finish">
-      <div class="confetti">${r.passed ? "🏆" : "📝"}</div>
-      ${r.passed ? `<div class="stars-row">${[1, 2, 3].map((n) => `<span class="fstar ${n <= r.stars ? "on" : ""}">★</span>`).join("")}</div>` : ""}
-      <h2>${r.passed ? "Unit passed!" : "Almost there!"}</h2>
+      <div class="confetti">${medal || "🎯"}</div>
+      <div class="stars-row">${[1, 2, 3].map((n) => `<span class="fstar ${n <= r.stars ? "on" : ""}">★</span>`).join("")}</div>
+      <h2>Unit complete!</h2>
       <p class="muted">${esc(unit.title)}</p>
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
-      <p class="muted small-text">${r.passed ? "You scored 80% or higher 🎉" : "You need 80% to pass — review your words and try again!"}</p>
+      <p class="muted small-text">${rankLine}</p>
       ${achHtml}
       <div class="stack">
-        <button class="btn btn-primary" data-act="home">Back to lessons</button>
-        <button class="btn btn-ghost" data-act="retry">${r.passed ? "Retake test" : "Try again"}</button>
+        <button class="btn btn-primary" data-act="home">Continue</button>
+        <button class="btn btn-ghost" data-act="retry">Retake for a better score</button>
       </div>
     </div>`;
   app.querySelector('[data-act="home"]').onclick = () => go("home");
@@ -728,10 +835,12 @@ function checkpointNode(ui) {
   const unlocked = isUnlocked(id);
   const done = store.checkpointDone(id);
   const best = store.checkpointBest(id);
+  const tried = !done && best > 0; // attempted but scored < 30%
   const cls = !unlocked ? "locked" : done ? "done" : "ready";
   const sub = !unlocked ? "Finish the lessons above to unlock"
     : done ? `Done${best ? ` · best ${best}%` : ""} — review again`
-    : "Required · mixed review of everything so far";
+    : tried ? `Scored ${best}% — need 30% to pass`
+    : "Required · score 30% on a mixed review to continue";
   return `
     <button class="checkpoint ${cls}" data-checkpoint="${ui}" ${unlocked ? "" : "disabled"}>
       <span class="cp-ico">${!unlocked ? icon("lock", { size: 22 }) : icon("reset", { size: 24 })}</span>
@@ -789,23 +898,25 @@ function runReview(id, label, steps, restart) {
 
 function finishReview(id, label, correct, total, restart) {
   const r = store.checkpointResult({ id, title: label, correct, total });
+  const passed = r.pct >= 30; // checkpoints gate at 30%
   const achHtml = r.newAchievements.length
     ? `<div class="ach-pop"><div class="ach-pop-title">🎉 New achievement${r.newAchievements.length > 1 ? "s" : ""}!</div>
        ${r.newAchievements.map((a) => `<div class="ach-line">${a.icon} <b>${esc(a.title)}</b> — ${esc(a.desc)}</div>`).join("")}</div>` : "";
   app.innerHTML = `
     <div class="center-screen finish">
-      <div class="confetti">🧠</div>
-      <h2>Memory refreshed!</h2>
+      <div class="confetti">${passed ? "🧠" : "📝"}</div>
+      <h2>${passed ? "Memory refreshed!" : "Almost there!"}</h2>
       <p class="muted">${esc(label)}</p>
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${r.pct}%</div><div class="rc-lab">Score</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
+      <p class="muted small-text">${passed ? "You cleared the checkpoint 🎉" : "You need 30% to pass — review your words and try again."}</p>
       ${achHtml}
       <div class="stack">
         <button class="btn btn-primary" data-act="home">Continue</button>
-        <button class="btn btn-ghost" data-act="again">Review again</button>
+        <button class="btn btn-ghost" data-act="again">${passed ? "Review again" : "Try again"}</button>
       </div>
     </div>`;
   app.querySelector('[data-act="home"]').onclick = () => go("home");
@@ -1030,7 +1141,7 @@ function finishPractice(mode, label, correct, total) {
       <div class="result-cards">
         <div class="rc"><div class="rc-ico">${icon("target", { size: 22 })}</div><div class="rc-val">${pct}%</div><div class="rc-lab">Accuracy</div></div>
         <div class="rc"><div class="rc-ico">${icon("level", { size: 22 })}</div><div class="rc-val">+${r.xpGain}</div><div class="rc-lab">XP</div></div>
-        <div class="rc"><div class="rc-ico">${icon("skip", { size: 22 })}</div><div class="rc-val">+${r.skipGain}</div><div class="rc-lab">Skips</div></div>
+        <div class="rc"><div class="rc-ico">${icon("gems", { size: 22 })}</div><div class="rc-val">+${r.gemGain}</div><div class="rc-lab">Gems</div></div>
       </div>
       ${mode === "mistakes" ? `<p class="muted">${left ? `${left} word${left > 1 ? "s" : ""} still to review` : "You cleared all your review words! 🎉"}</p>` : ""}
       ${achHtml}
@@ -1059,8 +1170,8 @@ function renderRewards() {
     <main class="screen">
       <h1 class="page-title">${icon("rewards")} Rewards</h1>
       <div class="card shop-card">
-        <div class="card-title gem-title">${icon("skip", { size: 20 })} ${store.skips} skip${store.skips === 1 ? "" : "s"}</div>
-        <p class="muted small-text">Skips let you pass a question you don't know — without losing a heart. You start with 3; earn more by finishing parts, checkpoints and unit tests. Better scores earn more.</p>
+        <div class="card-title gem-title">${icon("gems", { size: 20 })} ${store.gems} gems</div>
+        <p class="muted small-text">Earn gems by finishing lessons — better scores earn more. Spend ${store.rescueCost()} gems to refill your hearts and keep going when you run out mid-lesson, or to skip a failed lesson's retry cooldown.</p>
       </div>
       <div class="card"><div class="card-title">Achievements — ${s.achievements.length}/${ACHIEVEMENTS.length}</div>
         <div class="badges-grid">${achHtml}</div></div>
@@ -1084,7 +1195,7 @@ function renderProfile() {
         <div class="summary-grid">
           <div><b>${s.xp}</b><span>XP</span></div><div><b>${store.level()}</b><span>Level</span></div>
           <div><b>${s.bestStreak}</b><span>Best streak</span></div><div><b>${store.completedCount()}</b><span>Parts</span></div>
-          <div><b>${s.achievements.length}</b><span>Badges</span></div><div><b>${store.skips}</b><span>Skips</span></div>
+          <div><b>${s.achievements.length}</b><span>Badges</span></div><div><b>${store.gems}</b><span>Gems</span></div>
         </div></div>
       <div class="card"><div class="card-title">Settings</div>
         <label class="setting-row"><span>${icon("audio",{size:18})} Speech speed</span><input type="range" min="0.5" max="1.2" step="0.05" value="${s.settings.ttsRate}" id="rate"></label>
@@ -1103,31 +1214,10 @@ function renderProfile() {
 }
 
 /* =====================================================================
- * HEARTS
- * ===================================================================== */
-function renderHearts() {
-  const mins = Math.ceil(store.msUntilNextHeart() / 60000);
-  app.innerHTML = `
-    ${statsBar()}
-    <main class="screen">
-      <h1 class="page-title">${icon("hearts")} Hearts</h1>
-      <div class="card center-card">
-        <div class="big-hearts">${`<span class="hfull">${icon("hearts", { size: 40 })}</span>`.repeat(store.hearts)}${`<span class="hempty">${icon("hearts", { size: 40 })}</span>`.repeat(5 - store.hearts)}</div>
-        <p>You have <b>${store.hearts}</b> of 5 hearts.</p>
-        <p class="muted small-text">${store.hearts >= 5 ? "Hearts are full!" : `Next heart in about ${mins} min. Hearts also refill as you take lessons.`}</p>
-        <p class="muted small-text">Stuck on a question? Tap <b>I don't know</b> in a lesson to spend a skip instead of losing a heart.</p>
-        <button class="btn btn-primary" data-act="back">Back to lessons</button>
-      </div>
-    </main>
-    ${tabBar("home")}`;
-  app.querySelector('[data-act="back"]').onclick = () => go("home");
-}
-
-/* =====================================================================
  * Router + events + boot
  * ===================================================================== */
 function render() {
-  ({ home: renderHome, dashboard: renderDashboard, history: renderHistory, rewards: renderRewards, profile: renderProfile, hearts: renderHearts }[state.route] || renderHome)();
+  ({ home: renderHome, dashboard: renderDashboard, history: renderHistory, rewards: renderRewards, profile: renderProfile }[state.route] || renderHome)();
 }
 
 app.addEventListener("click", (e) => {
@@ -1138,7 +1228,6 @@ app.addEventListener("click", (e) => {
   const hw = e.target.closest("[data-halfway]"); if (hw && !hw.disabled) return startHalfway(hw.dataset.halfway);
   const practice = e.target.closest("[data-practice]"); if (practice && !practice.disabled) return startPractice(practice.dataset.practice);
   const say = e.target.closest("[data-say]"); if (say) return speak(say.dataset.say);
-  const hearts = e.target.closest('[data-act="hearts"]'); if (hearts) return go("hearts");
 });
 
 render();
