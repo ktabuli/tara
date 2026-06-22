@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Tara! — a gamified Tagalog/Filipino learning PWA",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "smoke": "node tests/smoke.mjs"
   }
 }
