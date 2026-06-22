@@ -4,7 +4,7 @@ A gamified, **mobile-first** app that teaches **Tagalog / Filipino** to English 
 
 > **Tara!** is Tagalog for *"Let's go!"*
 
-🔗 **Live:** https://ktabuli.github.io/
+🔗 **Live:** https://ktabuli.github.io/tara/
 
 ## Features
 
@@ -12,19 +12,19 @@ Built around the project's overview notes:
 
 | # | Goal | How it's delivered |
 |---|------|--------------------|
-| 1 | **Gamified (like Duolingo)** | XP, levels, gems, hearts/lives, an unlockable learning path, stars per lesson, **required checkpoints** (a halfway review inside each unit + a cumulative review after every 2 units), a **Unit Test** per unit (80% to pass), and celebratory finish screens |
+| 1 | **Gamified (like Duolingo)** | XP, levels, accumulating **gems**, an unlockable learning path, stars per lesson, **required checkpoints** (a halfway review inside each unit + a cumulative review after every 2 units, pass ≥30%), a **required Unit Test** per unit (any score advances; best-score medal ranking), and celebratory finish screens. **Per-node challenge:** each node gives 3 hearts + 1 "I don't know" skip; run out and you can spend 10 gems to refill & continue, or fail and retry after a 5-min cooldown (10 gems skips it) |
 | 2 | **Reading, writing, speech / conversation** | Interleaved flashcards + games: multiple-choice, type-the-translation, fill-in-the-blank (cloze), tap-to-build a sentence, match-the-pairs, reading-comprehension dialogues, listen-and-choose & speak-aloud (Web Speech API), plus a quiz per lesson. Lessons are split into bite-sized parts that open with a recap |
 | 3 | **Progress tracker / dashboard** | A **Stats** screen with KPIs, a 7-day activity chart, per-unit completion bars, and a skills breakdown |
 | 4 | **Mobile use** | Mobile-first responsive design, installable to the home screen, works offline, big touch targets, bottom tab bar |
 | 5 | **Review hub** | A **Review** screen to review words you've learned (tap to hear), revisit past mistakes, see your skills, and run quick mixed **practice** sessions — without repeating completed lessons |
 | 6 | **Daily streak** | Daily XP goal that drives a streak counter (with best-streak tracking and a graceful break if a day is missed) |
-| 7 | **Reward system** | 9 unlockable achievement badges and a gem shop (spend gems to refill hearts) |
+| 7 | **Reward system** | 12 unlockable achievement badges; gems are earned by finishing lessons (more for higher scores) and spent to refill hearts mid-lesson or skip a failed node's retry cooldown |
 
 ## Tech
 
 - **No build step.** Plain HTML, CSS and ES-module JavaScript — deploys straight to GitHub Pages.
 - **Offline-first PWA** via a service worker + web manifest.
-- **Persistent progress** in `localStorage` (XP, streaks, hearts, history, achievements, settings).
+- **Persistent progress** in `localStorage` (XP, gems, streaks, lesson/checkpoint/unit-test history, node cooldowns, achievements, settings). Hearts and the per-node skip are ephemeral (per attempt), not stored.
 - **Speech** uses the browser's built-in `SpeechSynthesis` (text-to-speech) and `SpeechRecognition` (voice input). Both degrade gracefully when a browser lacks them (e.g. self-mark a speaking exercise).
 
 ## Project structure
@@ -38,9 +38,12 @@ assets/
   img/icon.svg            App icon (Philippine sun)
   js/
     curriculum.js         Course content (units → lessons → vocab)
-    store.js              Persistent state: XP, streak, hearts, achievements
+    store.js              Persistent state: XP, gems, streak, cooldowns, achievements
     lessons.js            Exercise generation + speech (TTS / recognition)
     app.js                UI, navigation, lesson player
+tests/
+    *.test.mjs            Unit tests (node --test)
+    smoke.mjs             Headless boot/render check (npm run smoke)
 ```
 
 ## Adding content
@@ -70,10 +73,13 @@ exercise engine, and the progress store). They use Node's built-in test
 runner — **no dependencies, no build**:
 
 ```bash
-node --test        # or: npm test
+node --test        # or: npm test   — 37 unit tests
+npm run smoke      # headless boot/render check of app.js (tests/smoke.mjs)
 ```
 
-They also run automatically in CI on every push (`.github/workflows/test.yml`).
+The smoke test loads `app.js` under a tiny fake DOM and asserts every screen
+renders and a lesson opens — catching render-time errors the unit tests can't.
+Both run automatically in CI on every push/PR (`.github/workflows/test.yml`).
 
 ## Curriculum at a glance
 
